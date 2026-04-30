@@ -20,7 +20,6 @@ import {
   Sparkles,
   StickyNote,
   User,
-  Wand2,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -142,11 +141,11 @@ const sendEmail = async ({
 
 const escapeHtml = (value: string) =>
   value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
 const buildEmailSignature = (onboarding: UserOnboarding | null) => {
   if (!onboarding) return "";
@@ -669,7 +668,7 @@ export default function ClientDetail({
     const signatureHtml = buildEmailSignature(onboarding);
     const html = `
       <div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.7;color:#111827;">
-        ${escapeHtml(emailContent).replaceAll("\n", "<br />")}
+      ${escapeHtml(emailContent).replace(/\n/g, "<br />")}
         ${signatureHtml}
       </div>
     `;
