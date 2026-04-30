@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Session } from "@supabase/supabase-js";
 import {
-  BarChart3,
   CheckCircle2,
   Clock3,
   Loader2,
@@ -99,9 +98,24 @@ export default function EmailLogs({ session }: EmailLogsProps) {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
         <StatCard label="Envoyés" value={sentCount} icon={<CheckCircle2 />} />
-        <StatCard label="Échecs" value={failedCount} icon={<XCircle />} tone="rose" />
-        <StatCard label="Ouverts" value={openedCount} icon={<Mail />} tone="violet" />
-        <StatCard label="Cliqués" value={clickedCount} icon={<MousePointerClick />} tone="cyan" />
+        <StatCard
+          label="Échecs"
+          value={failedCount}
+          icon={<XCircle />}
+          tone="rose"
+        />
+        <StatCard
+          label="Ouverts"
+          value={openedCount}
+          icon={<Mail />}
+          tone="violet"
+        />
+        <StatCard
+          label="Cliqués"
+          value={clickedCount}
+          icon={<MousePointerClick />}
+          tone="cyan"
+        />
       </div>
 
       <div className="rounded-[2rem] border border-white/75 bg-white/70 p-4 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl">
@@ -170,7 +184,9 @@ export default function EmailLogs({ session }: EmailLogsProps) {
                         {log.template_type || "—"}
                       </td>
 
-                      <td className="px-4 py-4">{log.recipient_email || "—"}</td>
+                      <td className="px-4 py-4">
+                        {log.recipient_email || "—"}
+                      </td>
 
                       <td className="px-4 py-4">
                         <div className="max-w-sm">
@@ -189,7 +205,10 @@ export default function EmailLogs({ session }: EmailLogsProps) {
 
                       <td className="px-4 py-4">
                         {log.opened_at ? (
-                          <CheckCircle2 size={18} className="text-emerald-600" />
+                          <CheckCircle2
+                            size={18}
+                            className="text-emerald-600"
+                          />
                         ) : (
                           <Clock3 size={18} className="text-slate-300" />
                         )}
@@ -264,7 +283,9 @@ function StatusBadge({ status }: { status: string }) {
       : "bg-slate-50 text-slate-600 border-slate-100";
 
   return (
-    <span className={`rounded-full border px-3 py-1 text-xs font-black ${classes}`}>
+    <span
+      className={`rounded-full border px-3 py-1 text-xs font-black ${classes}`}
+    >
       {status}
     </span>
   );
@@ -313,5 +334,8 @@ function SmallMetric({ label, value }: { label: string; value: string }) {
 }
 
 function stripHtml(value: string) {
-  return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }

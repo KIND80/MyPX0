@@ -8,7 +8,6 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
-  Image,
   Loader2,
   Mail,
   Palette,

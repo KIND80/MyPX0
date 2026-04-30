@@ -4,7 +4,6 @@ import { Session } from "@supabase/supabase-js";
 import { sendEmail } from "../lib/email";
 import {
   BarChart3,
-  CheckCircle2,
   Loader2,
   MailPlus,
   Megaphone,
@@ -196,7 +195,8 @@ export default function Campaigns({ session }: CampaignsProps) {
       subject: form.subject || null,
       content: form.content || null,
       target_type: form.target_type,
-      target_group: form.target_type === "group" ? form.target_group || null : null,
+      target_group:
+        form.target_type === "group" ? form.target_group || null : null,
       target_client_id:
         form.target_type === "client" ? form.target_client_id || null : null,
       status: form.status || "draft",
@@ -298,15 +298,15 @@ export default function Campaigns({ session }: CampaignsProps) {
       alert("La campagne doit avoir un sujet et un contenu.");
       return;
     }
-  
+
     let targetedClients: ClientPreview[] = [];
-  
+
     if (campaign.target_type === "client") {
       if (!campaign.target_client_id) {
         alert("Choisis un client avant d’envoyer.");
         return;
       }
-  
+
       targetedClients = clients.filter(
         (client) => client.id === campaign.target_client_id && client.email
       );
@@ -315,7 +315,7 @@ export default function Campaigns({ session }: CampaignsProps) {
         alert("Choisis un groupe cible avant d’envoyer.");
         return;
       }
-  
+
       targetedClients = clients.filter(
         (client) =>
           client.email &&
@@ -324,36 +324,40 @@ export default function Campaigns({ session }: CampaignsProps) {
             campaign.target_group?.toLowerCase()
       );
     }
-  
+
     if (targetedClients.length === 0) {
       alert("Aucun client avec email trouvé pour ce ciblage.");
       return;
     }
-  
+
     const confirmSend = confirm(
       campaign.target_type === "client"
         ? "Envoyer cet email à ce client ?"
         : `Envoyer cette campagne à ${targetedClients.length} client(s) ? Chaque client recevra un email séparé et privé.`
     );
-  
+
     if (!confirmSend) return;
-  
+
     setSendingId(campaign.id);
-  
+
     let successCount = 0;
     let failedCount = 0;
-  
+
     for (const client of targetedClients) {
       const subject = (campaign.subject || "")
-        .replaceAll("{{first_name}}", client.first_name || "")
-        .replaceAll("{{group_name}}", client.group_name || "");
-  
+        .split("{{first_name}}")
+        .join(client.first_name || "")
+        .split("{{group_name}}")
+        .join(client.group_name || "");
+
       const rawContent = (campaign.content || "")
-        .replaceAll("{{first_name}}", client.first_name || "")
-        .replaceAll("{{group_name}}", client.group_name || "");
-  
-      const htmlBase = rawContent.replaceAll("\n", "<br />");
-  
+        .split("{{first_name}}")
+        .join(client.first_name || "")
+        .split("{{group_name}}")
+        .join(client.group_name || "");
+
+      const htmlBase = rawContent.split("\n").join("<br />");
+
       const { data: logData, error: logError } = await supabase
         .from("email_logs")
         .insert({
@@ -368,20 +372,20 @@ export default function Campaigns({ session }: CampaignsProps) {
         })
         .select("id")
         .single();
-  
+
       if (logError || !logData?.id) {
         failedCount++;
         continue;
       }
-  
+
       const trackedHtml = addTrackingToHtml(htmlBase, logData.id);
-  
+
       const result = await sendEmail({
         to: client.email as string,
         subject,
         html: trackedHtml,
       });
-  
+
       await supabase
         .from("email_logs")
         .update({
@@ -390,10 +394,10 @@ export default function Campaigns({ session }: CampaignsProps) {
         })
         .eq("id", logData.id)
         .eq("user_id", session.user.id);
-  
+
       if (result.success) {
         successCount++;
-  
+
         await supabase
           .from("clients")
           .update({ last_contact_at: new Date().toISOString() })
@@ -403,7 +407,7 @@ export default function Campaigns({ session }: CampaignsProps) {
         failedCount++;
       }
     }
-  
+
     await supabase
       .from("campaigns")
       .update({
@@ -414,15 +418,15 @@ export default function Campaigns({ session }: CampaignsProps) {
       })
       .eq("id", campaign.id)
       .eq("user_id", session.user.id);
-  
+
     await refreshCampaignStats(campaign.id, successCount);
-  
+
     setSendingId(null);
-  
+
     alert(
       `Campagne terminée : ${successCount} envoyé(s), ${failedCount} échec(s).`
     );
-  
+
     fetchCampaigns();
     fetchClients();
   };
@@ -458,8 +462,10 @@ export default function Campaigns({ session }: CampaignsProps) {
     const groupName = form.target_group || "Groupe";
 
     return (form.content || "")
-      .replaceAll("{{first_name}}", firstName)
-      .replaceAll("{{group_name}}", groupName);
+      .split("{{first_name}}")
+      .join(firstName)
+      .split("{{group_name}}")
+      .join(groupName);
   }, [form.content, form.target_group, targetedClients]);
 
   const readyCount = campaigns.filter((c) => c.status === "ready").length;
@@ -689,184 +695,191 @@ export default function Campaigns({ session }: CampaignsProps) {
                   required
                 />
 
-<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-  <select
-    name="target_type"
-    value={form.target_type}
-    onChange={handleChange}
-    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-  >
-    <option value="group">Envoyer à un groupe</option>
-    <option value="client">Envoyer à un client précis</option>
-  </select>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <select
+                    name="target_type"
+                    value={form.target_type}
+                    onChange={handleChange}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+                  >
+                    <option value="group">Envoyer à un groupe</option>
+                    <option value="client">Envoyer à un client précis</option>
+                  </select>
 
-  <select
-    name="status"
-    value={form.status}
-    onChange={handleChange}
-    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-  >
-    <option value="draft">Brouillon</option>
-    <option value="scheduled">Programmée</option>
-    <option value="ready">Prête à envoyer</option>
-  </select>
-</div>
+                  <select
+                    name="status"
+                    value={form.status}
+                    onChange={handleChange}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+                  >
+                    <option value="draft">Brouillon</option>
+                    <option value="scheduled">Programmée</option>
+                    <option value="ready">Prête à envoyer</option>
+                  </select>
+                </div>
 
-{form.target_type === "group" ? (
-  <select
-    name="target_group"
-    value={form.target_group}
-    onChange={handleChange}
-    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-  >
-    <option value="">Choisir un groupe</option>
-    {groups.map((group) => (
-      <option key={group} value={group}>
-        {group}
-      </option>
-    ))}
-  </select>
-) : (
-  <select
-    name="target_client_id"
-    value={form.target_client_id}
-    onChange={handleChange}
-    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-  >
-    <option value="">Choisir un client</option>
-    {clients
-      .filter((client) => client.email)
-      .map((client) => (
-        <option key={client.id} value={client.id}>
-          {[client.first_name, client.last_name].filter(Boolean).join(" ") ||
-            "Contact"}{" "}
-          — {client.email}
-        </option>
-      ))}
-  </select>
-)}
+                {form.target_type === "group" ? (
+                  <select
+                    name="target_group"
+                    value={form.target_group}
+                    onChange={handleChange}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+                  >
+                    <option value="">Choisir un groupe</option>
+                    {groups.map((group) => (
+                      <option key={group} value={group}>
+                        {group}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    name="target_client_id"
+                    value={form.target_client_id}
+                    onChange={handleChange}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+                  >
+                    <option value="">Choisir un client</option>
+                    {clients
+                      .filter((client) => client.email)
+                      .map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {[client.first_name, client.last_name]
+                            .filter(Boolean)
+                            .join(" ") || "Contact"}{" "}
+                          — {client.email}
+                        </option>
+                      ))}
+                  </select>
+                )}
 
-<Input
-  name="subject"
-  placeholder="Sujet de l’email"
-  value={form.subject}
-  onChange={handleChange}
-/>
+                <Input
+                  name="subject"
+                  placeholder="Sujet de l’email"
+                  value={form.subject}
+                  onChange={handleChange}
+                />
 
-<div className="rounded-2xl border border-dashed border-violet-200 bg-violet-50 px-4 py-3 text-xs font-bold text-slate-500">
-  Variables disponibles :
-  <span className="ml-2 rounded-full border border-violet-100 bg-white px-2 py-1">
-    {"{{first_name}}"}
-  </span>
-  <span className="ml-2 rounded-full border border-violet-100 bg-white px-2 py-1">
-    {"{{group_name}}"}
-  </span>
-</div>
+                <div className="rounded-2xl border border-dashed border-violet-200 bg-violet-50 px-4 py-3 text-xs font-bold text-slate-500">
+                  Variables disponibles :
+                  <span className="ml-2 rounded-full border border-violet-100 bg-white px-2 py-1">
+                    {"{{first_name}}"}
+                  </span>
+                  <span className="ml-2 rounded-full border border-violet-100 bg-white px-2 py-1">
+                    {"{{group_name}}"}
+                  </span>
+                </div>
 
-<textarea
-  name="content"
-  placeholder="Exemple : Bonjour {{first_name}}, je te contacte concernant une opportunité liée à {{group_name}}..."
-  value={form.content}
-  onChange={handleChange}
-  className="min-h-[240px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300 transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-/>
+                <textarea
+                  name="content"
+                  placeholder="Exemple : Bonjour {{first_name}}, je te contacte concernant une opportunité liée à {{group_name}}..."
+                  value={form.content}
+                  onChange={handleChange}
+                  className="min-h-[240px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300 transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+                />
 
-<div className="flex justify-end gap-3 pt-2">
-  <button
-    type="button"
-    onClick={resetModal}
-    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 transition hover:text-slate-950"
-  >
-    Annuler
-  </button>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={resetModal}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 transition hover:text-slate-950"
+                  >
+                    Annuler
+                  </button>
 
-  <button
-    type="submit"
-    disabled={loading}
-    className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300 transition hover:-translate-y-0.5 hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
-  >
-    {loading ? (
-      <>
-        <Loader2 size={16} className="animate-spin" />
-        Enregistrement...
-      </>
-    ) : (
-      <>
-        <MailPlus size={16} />
-        Enregistrer
-      </>
-    )}
-  </button>
-</div>
-</form>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300 transition hover:-translate-y-0.5 hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Enregistrement...
+                      </>
+                    ) : (
+                      <>
+                        <MailPlus size={16} />
+                        Enregistrer
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
 
-<div className="space-y-4">
-  <div className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
-    <div className="flex items-center gap-2">
-      <Sparkles size={16} className="text-violet-700" />
-      <p className="text-sm font-black text-slate-950">Aperçu dynamique</p>
-    </div>
+              <div className="space-y-4">
+                <div className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={16} className="text-violet-700" />
+                    <p className="text-sm font-black text-slate-950">
+                      Aperçu dynamique
+                    </p>
+                  </div>
 
-    <div className="mt-4 rounded-3xl border border-slate-100 bg-slate-50 p-5">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-        Sujet
-      </p>
+                  <div className="mt-4 rounded-3xl border border-slate-100 bg-slate-50 p-5">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                      Sujet
+                    </p>
 
-      <p className="mt-2 text-base font-black text-slate-950">
-        {form.subject || "Ton sujet apparaîtra ici"}
-      </p>
+                    <p className="mt-2 text-base font-black text-slate-950">
+                      {form.subject || "Ton sujet apparaîtra ici"}
+                    </p>
 
-      <p className="mt-5 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-        Message
-      </p>
+                    <p className="mt-5 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                      Message
+                    </p>
 
-      <div className="mt-2 whitespace-pre-wrap text-sm font-medium leading-7 text-slate-600">
-        {previewText || "Ton message personnalisé apparaîtra ici."}
-      </div>
-    </div>
-  </div>
+                    <div className="mt-2 whitespace-pre-wrap text-sm font-medium leading-7 text-slate-600">
+                      {previewText ||
+                        "Ton message personnalisé apparaîtra ici."}
+                    </div>
+                  </div>
+                </div>
 
-  <div className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
-    <p className="text-sm font-black text-slate-950">Ciblage estimé</p>
+                <div className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
+                  <p className="text-sm font-black text-slate-950">
+                    Ciblage estimé
+                  </p>
 
-    <p className="mt-2 text-3xl font-black text-slate-950">
-      {targetedClients.length}
-    </p>
+                  <p className="mt-2 text-3xl font-black text-slate-950">
+                    {targetedClients.length}
+                  </p>
 
-    <p className="mt-2 text-sm font-medium text-slate-500">
-      {form.target_type === "client"
-        ? "client sélectionné pour cet envoi"
-        : "client(s) trouvés dans le groupe sélectionné"}
-    </p>
+                  <p className="mt-2 text-sm font-medium text-slate-500">
+                    {form.target_type === "client"
+                      ? "client sélectionné pour cet envoi"
+                      : "client(s) trouvés dans le groupe sélectionné"}
+                  </p>
 
-    <div className="mt-4 space-y-2">
-      {targetedClients.slice(0, 5).map((client) => (
-        <div
-          key={client.id}
-          className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600"
-        >
-          {[client.first_name, client.last_name].filter(Boolean).join(" ") ||
-            "Contact"}{" "}
-          {client.email ? `• ${client.email}` : ""}
-        </div>
-      ))}
+                  <div className="mt-4 space-y-2">
+                    {targetedClients.slice(0, 5).map((client) => (
+                      <div
+                        key={client.id}
+                        className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600"
+                      >
+                        {[client.first_name, client.last_name]
+                          .filter(Boolean)
+                          .join(" ") || "Contact"}{" "}
+                        {client.email ? `• ${client.email}` : ""}
+                      </div>
+                    ))}
 
-      {targetedClients.length === 0 && (
-        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-400">
-          {form.target_type === "client"
-            ? "Aucun client sélectionné."
-            : "Aucun client trouvé pour ce groupe."}
+                    {targetedClients.length === 0 && (
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-400">
+                        {form.target_type === "client"
+                          ? "Aucun client sélectionné."
+                          : "Aucun client trouvé pour ce groupe."}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
-  </div>
-</div>
-</div>
-</div>
-</div>
-)}
-</div>
-);
+  );
 }
 
 function StatCard({

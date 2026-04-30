@@ -546,11 +546,13 @@ ${introText}
             />
 
             <div className="mt-3">
+              <p className="mb-2 text-sm font-black text-slate-600">
+                Photo du conseiller
+              </p>
               <LogoUpload
                 userId={session.user.id}
                 value={advisorPhotoUrl}
                 onChange={setAdvisorPhotoUrl}
-                label="Photo du conseiller"
               />
             </div>
           </BuilderCard>
@@ -629,11 +631,13 @@ ${introText}
             title="Visuels"
             brandColor={brandColor}
           >
+            <p className="mb-2 text-sm font-black text-slate-600">
+              Logo / photo entreprise
+            </p>
             <LogoUpload
               userId={session.user.id}
               value={logoUrl}
               onChange={setLogoUrl}
-              label="Logo / photo entreprise"
             />
 
             <Input
