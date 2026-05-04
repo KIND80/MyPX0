@@ -9,7 +9,6 @@ import {
   CalendarDays,
   CheckCircle2,
   Circle,
-  HelpCircle,
   Loader2,
   Mail,
   Palette,

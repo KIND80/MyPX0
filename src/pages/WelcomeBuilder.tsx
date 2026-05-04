@@ -8,7 +8,6 @@ import {
   MessageCircle,
   MousePointerClick,
   Palette,
-  Phone,
   Save,
   Sparkles,
   UserRound,
