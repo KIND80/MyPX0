@@ -208,7 +208,23 @@ export default function Clients({ session }: ClientsProps) {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
   const { settings } = useUserSettings(session);
+  const openClient = (clientId: string) => {
+    setSelectedClientId(clientId);
 
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", "clients");
+    url.searchParams.set("client_id", clientId);
+    window.history.replaceState({}, "", url.toString());
+  };
+
+  const closeClient = () => {
+    setSelectedClientId(null);
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", "clients");
+    url.searchParams.delete("client_id");
+    window.history.replaceState({}, "", url.toString());
+  };
   const fetchClients = async () => {
     setLoadingClients(true);
 
@@ -235,7 +251,14 @@ export default function Clients({ session }: ClientsProps) {
   useEffect(() => {
     fetchClients();
   }, [session.user.id]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const clientIdFromUrl = params.get("client_id");
 
+    if (clientIdFromUrl) {
+      setSelectedClientId(clientIdFromUrl);
+    }
+  }, []);
   const groups = useMemo(() => {
     return Array.from(
       new Set(clients.map((client) => client.group_name).filter(Boolean))
@@ -548,7 +571,7 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       <ClientDetail
         session={session}
         clientId={selectedClientId}
-        onBack={() => setSelectedClientId(null)}
+        onBack={closeClient}
       />
     );
   }
@@ -690,7 +713,7 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
                 <ClientMobileCard
                   key={client.id}
                   client={client}
-                  onOpen={() => setSelectedClientId(client.id)}
+                  onOpen={() => openClient(client.id)}
                   onDelete={(e) => handleDeleteClient(e, client.id)}
                 />
               ))}
@@ -717,7 +740,7 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
                   {filteredClients.map((client) => (
                     <tr
                       key={client.id}
-                      onClick={() => setSelectedClientId(client.id)}
+                      onClick={() => openClient(client.id)}
                       className="cursor-pointer border-t border-slate-100 transition hover:bg-violet-50/50"
                     >
                       <td className="px-4 py-4 font-black text-slate-950">

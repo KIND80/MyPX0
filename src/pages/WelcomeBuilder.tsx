@@ -13,6 +13,7 @@ import {
   Sparkles,
   UserRound,
   Image,
+  ShieldCheck,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import LogoUpload from "../components/LogoUpload";
@@ -48,22 +49,41 @@ type UserOnboarding = {
   welcome_content: string | null;
 };
 
-const defaultSubject = "Bienvenue {{first_name}} — ravi de vous accompagner";
+const defaultSubject = "Bienvenue {{first_name}}";
+
+const defaultIntroText =
+  "Bonjour {{first_name}},\n\nRavi de vous compter parmi mes contacts.\n\nJe reste à votre disposition pour échanger selon vos besoins.\n\nÀ bientôt,\n{{advisor_name}}";
 
 function replaceVars(value: string) {
   return value
     .split("{{first_name}}")
     .join("Christian")
-    .split("{{group_name}}")
-    .join("Assurance")
-    .split("{{city}}")
-    .join("Genève")
-    .split("{{company}}")
-    .join("Entreprise Exemple")
     .split("{{company_name}}")
     .join("MyPX")
     .split("{{advisor_name}}")
     .join("Christian");
+}
+
+function ensureRequiredWelcomeVars(subjectValue: string, contentValue: string) {
+  let safeSubject = subjectValue.trim();
+  let safeContent = contentValue.trim();
+
+  if (!safeSubject.includes("{{first_name}}")) {
+    safeSubject = "Bienvenue {{first_name}}";
+  }
+
+  if (!safeContent.includes("{{first_name}}")) {
+    safeContent = `Bonjour {{first_name}},\n\n${safeContent}`;
+  }
+
+  if (!safeContent.includes("{{advisor_name}}")) {
+    safeContent = `${safeContent}\n\nÀ bientôt,\n{{advisor_name}}`;
+  }
+
+  return {
+    safeSubject,
+    safeContent,
+  };
 }
 
 function isValidHexColor(value: string) {
@@ -117,9 +137,7 @@ export default function WelcomeBuilder({ session }: WelcomeBuilderProps) {
     "Bienvenue dans notre portefeuille client"
   );
 
-  const [introText, setIntroText] = useState(
-    "Bonjour {{first_name}},\n\nJe suis ravi de pouvoir vous accompagner concernant {{group_name}}.\n\nVous faites désormais partie de notre portefeuille client, ce qui nous permettra de mieux suivre vos besoins, vos opportunités et les prochaines actions utiles pour vous."
-  );
+  const [introText, setIntroText] = useState(defaultIntroText);
 
   const [whyText, setWhyText] = useState(
     "Vous recevez ce message car vous avez été ajouté à notre portefeuille client à la suite d’un échange, d’une demande d’information ou d’une opportunité identifiée."
@@ -139,8 +157,15 @@ export default function WelcomeBuilder({ session }: WelcomeBuilderProps) {
 
   const brandColor = useMemo(() => normalizeColor(mainColor), [mainColor]);
 
+  const hasFirstNameInSubject = subject.includes("{{first_name}}");
+  const hasFirstNameInContent = introText.includes("{{first_name}}");
+  const hasAdvisorNameInContent = introText.includes("{{advisor_name}}");
+
   const insertVariable = (variable: string) => {
-    setIntroText((prev) => `${prev} ${variable}`);
+    setIntroText((prev) => {
+      if (prev.includes(variable)) return prev;
+      return `${prev}\n${variable}`;
+    });
   };
 
   const applyOnboardingData = (onboarding: UserOnboarding | null) => {
@@ -209,7 +234,7 @@ export default function WelcomeBuilder({ session }: WelcomeBuilderProps) {
     fetchData();
   }, [session.user.id]);
 
-  const generateHtml = () => {
+  const generateHtml = (customIntroText = introText) => {
     const safeLogo =
       logoUrl.trim() ||
       `https://dummyimage.com/160x160/${hexToDummyImageColor(
@@ -256,7 +281,7 @@ export default function WelcomeBuilder({ session }: WelcomeBuilderProps) {
 
       <div style="padding:34px;">
         <div style="font-size:15px;line-height:1.85;color:#334155;white-space:pre-line;">
-${introText}
+${customIntroText}
         </div>
 
         <div style="margin:28px 0;padding:20px;border-radius:22px;background:${softBrandBg};border:1px solid ${mediumBrandBg};">
@@ -385,8 +410,21 @@ ${introText}
   );
 
   const handleSave = async () => {
-    if (!subject.trim()) {
-      alert("Ajoute un sujet pour l’email.");
+    const { safeSubject, safeContent } = ensureRequiredWelcomeVars(
+      subject,
+      introText
+    );
+
+    setSubject(safeSubject);
+    setIntroText(safeContent);
+
+    if (!advisorName.trim()) {
+      alert("Ajoute le nom du conseiller avant d’enregistrer.");
+      return;
+    }
+
+    if (!companyEmail.trim()) {
+      alert("Ajoute un email d’entreprise avant d’enregistrer.");
       return;
     }
 
@@ -396,8 +434,8 @@ ${introText}
       user_id: session.user.id,
       name: "Template bienvenue premium",
       type: "welcome_email",
-      subject: subject.trim(),
-      content: finalHtml,
+      subject: safeSubject,
+      content: generateHtml(safeContent),
       is_active: true,
     };
 
@@ -417,7 +455,7 @@ ${introText}
     }
 
     await fetchData();
-    alert("Template de bienvenue premium enregistré.");
+    alert("Template de bienvenue enregistré.");
   };
 
   const previewSubject = replaceVars(subject);
@@ -443,7 +481,7 @@ ${introText}
           }}
         >
           <Mail size={14} />
-          Email premium
+          Email Welcome
         </div>
 
         <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950">
@@ -451,8 +489,9 @@ ${introText}
         </h2>
 
         <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
-          Crée un email de bienvenue professionnel avec photo, identité
-          visuelle, carte de contact, CTA, signature et pied de page.
+          Crée un email de bienvenue simple, professionnel et personnalisé avec
+          prénom client, signature conseiller, carte de visite et boutons
+          d’action.
         </p>
       </div>
 
@@ -476,26 +515,44 @@ ${introText}
                 backgroundColor: hexToRgba(brandColor, 0.08),
               }}
             >
-              <span>Variables cliquables :</span>
-              {[
-                "{{first_name}}",
-                "{{group_name}}",
-                "{{city}}",
-                "{{company}}",
-              ].map((variable) => (
-                <button
-                  key={variable}
-                  type="button"
-                  onClick={() => insertVariable(variable)}
-                  className="ml-2 mt-2 rounded-full border bg-white px-3 py-1 font-black transition hover:opacity-80"
-                  style={{
-                    color: brandColor,
-                    borderColor: hexToRgba(brandColor, 0.18),
-                  }}
-                >
-                  {variable}
-                </button>
-              ))}
+              <div className="flex flex-wrap items-center gap-2">
+                <span>Variables obligatoires :</span>
+
+                {["{{first_name}}", "{{advisor_name}}"].map((variable) => (
+                  <button
+                    key={variable}
+                    type="button"
+                    onClick={() => insertVariable(variable)}
+                    className="rounded-full border bg-white px-3 py-1 font-black transition hover:opacity-80"
+                    style={{
+                      color: brandColor,
+                      borderColor: hexToRgba(brandColor, 0.18),
+                    }}
+                  >
+                    {variable}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <StatusPill
+                  valid={hasFirstNameInSubject}
+                  label="Prénom dans le sujet"
+                />
+                <StatusPill
+                  valid={hasFirstNameInContent}
+                  label="Prénom dans le message"
+                />
+                <StatusPill
+                  valid={hasAdvisorNameInContent}
+                  label="Signature conseiller"
+                />
+              </div>
+
+              <p className="mt-3 text-xs leading-5 text-slate-500">
+                Ces variables sont protégées : MyPX les remettra automatiquement
+                si elles sont supprimées avant l’enregistrement.
+              </p>
             </div>
 
             <Input
@@ -612,7 +669,7 @@ ${introText}
               <Input
                 value={whatsappUrl}
                 onChange={setWhatsappUrl}
-                placeholder="Lien WhatsApp, ex: https://wa.me/41797896193"
+                placeholder="Lien WhatsApp, ex: +41797896193"
               />
             </div>
 
@@ -698,7 +755,7 @@ ${introText}
               ) : (
                 <>
                   <Save size={16} />
-                  Enregistrer le template premium
+                  Enregistrer le template Welcome
                 </>
               )}
             </button>
@@ -732,19 +789,19 @@ ${introText}
 
           <div className="rounded-[2rem] border border-white/75 bg-white/70 p-5 shadow-xl shadow-violet-100/50 backdrop-blur-2xl">
             <div className="flex items-center gap-2">
-              <Phone size={16} style={{ color: brandColor }} />
+              <ShieldCheck size={16} style={{ color: brandColor }} />
               <p className="text-sm font-black text-slate-950">
-                Ce que ça apporte
+                Configuration simplifiée
               </p>
             </div>
 
             <div className="mt-4 space-y-3">
               {[
-                "Couleur principale appliquée au header et aux boutons",
-                "Email plus humain avec signature conseiller",
+                "Email simple et personnalisé avec prénom client",
+                "Signature conseiller obligatoire",
+                "Carte de visite professionnelle intégrée",
                 "Boutons email, WhatsApp et RDV",
-                "Bloc rassurant : pourquoi le client reçoit ce mail",
-                "Carte de visite intégrée dans chaque email",
+                "Identité visuelle cohérente avec ton activité",
               ].map((item) => (
                 <div
                   key={item}
@@ -780,6 +837,23 @@ function BuilderCard({
       </div>
 
       <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+function StatusPill({ valid, label }: { valid: boolean; label: string }) {
+  return (
+    <div
+      className={`flex items-center gap-2 rounded-full px-3 py-2 text-xs font-black ${
+        valid ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+      }`}
+    >
+      <span
+        className={`h-2 w-2 rounded-full ${
+          valid ? "bg-emerald-500" : "bg-rose-500"
+        }`}
+      />
+      {label}
     </div>
   );
 }

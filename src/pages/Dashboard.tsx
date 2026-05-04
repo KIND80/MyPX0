@@ -7,6 +7,8 @@ import EmailLogs from "./EmailLogs";
 import FollowUps from "./FollowUps";
 import Clients from "./Clients";
 import RadarAI from "./RadarAI";
+import Settings from "./Settings";
+import { Settings as SettingsIcon } from "lucide-react";
 import {
   Bell,
   Bot,
@@ -39,7 +41,8 @@ type ActiveView =
   | "welcome"
   | "email_logs"
   | "follow_ups"
-  | "radar_ai";
+  | "radar_ai"
+  | "settings";
 
 type ClientRow = {
   id: string;
@@ -108,6 +111,7 @@ const navItems: {
   { view: "welcome", label: "Welcome", icon: Mail },
   { view: "email_logs", label: "Email Logs", icon: Mail },
   { view: "follow_ups", label: "Relances", icon: Bell },
+  { view: "settings", label: "Paramètres", icon: SettingsIcon },
 ];
 
 const calculateScore = (client: ClientRow) => {
@@ -171,14 +175,53 @@ function daysUntilBirthday(dateString: string | null) {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
+function getInitialView(): ActiveView {
+  const params = new URLSearchParams(window.location.search);
+  const view = params.get("view") as ActiveView | null;
+
+  const allowedViews: ActiveView[] = [
+    "home",
+    "clients",
+    "campaigns",
+    "welcome",
+    "email_logs",
+    "follow_ups",
+    "radar_ai",
+    "settings",
+  ];
+
+  return view && allowedViews.includes(view) ? view : "home";
+}
+
 export default function Dashboard({ session }: DashboardProps) {
   const [showOnboarding, setShowOnboarding] = useState(true);
-  const [activeView, setActiveView] = useState<ActiveView>("home");
+  const [activeView, setActiveViewState] = useState<ActiveView>(getInitialView);
 
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [followUps, setFollowUps] = useState<FollowUpRow[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
+
+  const setActiveView = (view: ActiveView) => {
+    setActiveViewState(view);
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", view);
+
+    if (view !== "clients") {
+      url.searchParams.delete("client_id");
+    }
+
+    window.history.replaceState({}, "", url.toString());
+  };
+
+  const openClientFromDashboard = (clientId: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", "clients");
+    url.searchParams.set("client_id", clientId);
+    window.history.replaceState({}, "", url.toString());
+    setActiveViewState("clients");
+  };
 
   const userName = useMemo(() => {
     const fullName = session.user.user_metadata?.full_name as
@@ -365,6 +408,7 @@ export default function Dashboard({ session }: DashboardProps) {
     welcome: <WelcomeBuilder session={session} />,
     email_logs: <EmailLogs session={session} />,
     follow_ups: <FollowUps session={session} />,
+    settings: <Settings session={session} />,
   };
 
   if (activeView !== "home") {
@@ -385,323 +429,325 @@ export default function Dashboard({ session }: DashboardProps) {
       setActiveView={setActiveView}
       handleLogout={handleLogout}
     >
-      <header className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/70 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-violet-700 shadow-sm backdrop-blur-xl">
-            <Bot size={14} />
-            SaaS portefeuille client
+      <div className="mx-auto w-full max-w-7xl">
+        <header className="mb-6 flex flex-col gap-5 sm:mb-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/80 bg-white/75 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-violet-700 shadow-sm backdrop-blur-xl sm:px-4 sm:text-xs">
+              <Bot size={14} className="shrink-0" />
+              <span className="truncate">SaaS portefeuille client</span>
+            </div>
+
+            <h2 className="mt-4 text-3xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl md:text-5xl xl:text-6xl">
+              Bonjour, {userName}
+            </h2>
+
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
+              MyPX te guide vers les bons clients, les bonnes relances et les
+              meilleures opportunités de conversation.
+            </p>
           </div>
 
-          <h2 className="mt-4 text-4xl font-black leading-tight tracking-tight text-slate-950 md:text-6xl">
-            Bonjour, {userName}
-          </h2>
-
-          <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
-            MyPX te guide vers les bons clients, les bonnes relances et les
-            meilleures opportunités de conversation.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => setActiveView("clients")}
-            className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-sm font-black text-white shadow-xl shadow-slate-300 transition hover:-translate-y-0.5 hover:bg-black"
-          >
-            <Plus size={17} />
-            Gérer les clients
-          </button>
-
-          <button
-            onClick={handleLogout}
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-black text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:text-slate-950"
-          >
-            <LogOut size={17} />
-            Déconnexion
-          </button>
-        </div>
-      </header>
-
-      {showOnboarding && (
-        <section className="mb-8 overflow-hidden rounded-[2rem] border border-white/75 bg-white/70 p-5 shadow-2xl shadow-violet-100 backdrop-blur-2xl sm:p-6">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-violet-700">
-                <Sparkles size={14} />
-                Première connexion
-              </div>
-
-              <h3 className="mt-4 text-2xl font-black tracking-tight text-slate-950">
-                Bienvenue dans ton espace intelligent
-              </h3>
-
-              <p className="mt-3 text-sm leading-7 text-slate-600">
-                Voici le workflow conseillé pour configurer ton environnement et
-                commencer à exploiter ton portefeuille.
-              </p>
-            </div>
+          <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
+            <button
+              onClick={() => setActiveView("clients")}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-sm font-black text-white shadow-xl shadow-slate-300 transition hover:-translate-y-0.5 hover:bg-black active:scale-[0.98]"
+            >
+              <Plus size={17} />
+              Gérer les clients
+            </button>
 
             <button
-              onClick={() => setShowOnboarding(false)}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-500 transition hover:text-slate-950"
+              onClick={handleLogout}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/85 px-5 py-4 text-sm font-black text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:text-slate-950 active:scale-[0.98]"
             >
-              <X size={16} />
-              Fermer
+              <LogOut size={17} />
+              Déconnexion
             </button>
           </div>
+        </header>
 
-          <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-4">
-            {onboardingSteps.map((step, index) => (
-              <div
-                key={step.title}
-                className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-violet-100"
+        {showOnboarding && (
+          <section className="mb-6 overflow-hidden rounded-[1.75rem] border border-white/80 bg-white/75 p-4 shadow-2xl shadow-violet-100 backdrop-blur-2xl sm:mb-8 sm:rounded-[2rem] sm:p-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-2xl">
+                <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-violet-700 sm:text-xs">
+                  <Sparkles size={14} />
+                  Première connexion
+                </div>
+
+                <h3 className="mt-4 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                  Bienvenue dans ton espace intelligent
+                </h3>
+
+                <p className="mt-3 text-sm leading-7 text-slate-600">
+                  Voici le workflow conseillé pour configurer ton environnement
+                  et commencer à exploiter ton portefeuille.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowOnboarding(false)}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-500 transition hover:text-slate-950"
               >
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-500">
-                  Étape {index + 1}
-                </p>
-
-                <h4 className="mt-3 text-lg font-black text-slate-950">
-                  {step.title}
-                </h4>
-
-                <p className="mt-2 text-sm leading-6 text-slate-500">
-                  {step.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {stats.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <div
-              key={item.label}
-              className="rounded-[2rem] border border-white/75 bg-white/70 p-5 shadow-xl shadow-violet-100/50 backdrop-blur-2xl transition hover:-translate-y-1"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-bold text-slate-500">
-                    {item.label}
-                  </p>
-
-                  <p className="mt-3 text-3xl font-black text-slate-950">
-                    {item.value}
-                  </p>
-
-                  <p className="mt-2 text-xs font-medium text-slate-400">
-                    {item.sub}
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-slate-950 p-3 text-white shadow-lg shadow-slate-300">
-                  <Icon size={18} />
-                </div>
-              </div>
+                <X size={16} />
+                Fermer
+              </button>
             </div>
-          );
-        })}
-      </section>
 
-      <section className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <PriorityCard
-          title="Relances aujourd’hui"
-          value={loadingStats ? "..." : String(todayFollowUps.length)}
-          subtitle="À traiter immédiatement"
-          tone="orange"
-          emoji="🔥"
-        />
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {onboardingSteps.map((step, index) => (
+                <div
+                  key={step.title}
+                  className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-violet-100"
+                >
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-500">
+                    Étape {index + 1}
+                  </p>
 
-        <PriorityCard
-          title="En retard"
-          value={loadingStats ? "..." : String(dueFollowUps.length)}
-          subtitle="Opportunités en danger"
-          tone="amber"
-          emoji="⚠️"
-        />
+                  <h4 className="mt-3 text-base font-black text-slate-950 sm:text-lg">
+                    {step.title}
+                  </h4>
 
-        <PriorityCard
-          title="À recontacter maintenant"
-          value={loadingStats ? "..." : String(inactiveClients90.length)}
-          subtitle="Clients dormants à réveiller"
-          tone="cyan"
-          emoji="💡"
-        />
-      </section>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    {step.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
-      <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <DashboardCard
-          icon={<Flame size={18} className="text-orange-500" />}
-          title="Top clients chauds"
-        >
-          {hotClients.length === 0 ? (
-            <EmptyState text="Aucun client scoré pour le moment." />
-          ) : (
-            hotClients.map((client, index) => (
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {stats.map((item) => {
+            const Icon = item.icon;
+
+            return (
               <div
-                key={client.id}
-                className="rounded-3xl border border-orange-100 bg-orange-50 p-4"
+                key={item.label}
+                className="rounded-[1.75rem] border border-white/80 bg-white/75 p-5 shadow-xl shadow-violet-100/50 backdrop-blur-2xl transition hover:-translate-y-1 sm:rounded-[2rem]"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-black text-slate-950">
-                      #{index + 1}{" "}
-                      {[client.first_name, client.last_name]
-                        .filter(Boolean)
-                        .join(" ") || "Client"}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-500">
+                      {item.label}
                     </p>
 
-                    <p className="mt-1 text-xs font-medium text-orange-700">
-                      {client.group_name || "Sans groupe"} •{" "}
-                      {client.status || "prospect"}
+                    <p className="mt-3 break-words text-3xl font-black text-slate-950">
+                      {item.value}
+                    </p>
+
+                    <p className="mt-2 text-xs font-medium text-slate-400">
+                      {item.sub}
                     </p>
                   </div>
 
-                  <span className="rounded-full bg-orange-200 px-3 py-1 text-xs font-black text-orange-900">
-                    {client.score ?? 0}
-                  </span>
+                  <div className="shrink-0 rounded-2xl bg-slate-950 p-3 text-white shadow-lg shadow-slate-300">
+                    <Icon size={18} />
+                  </div>
                 </div>
-
-                <button
-                  onClick={() => setActiveView("clients")}
-                  className="mt-3 text-xs font-black text-orange-700 hover:underline"
-                >
-                  Ouvrir fiche →
-                </button>
               </div>
-            ))
-          )}
-        </DashboardCard>
+            );
+          })}
+        </section>
 
-        <DashboardCard
-          icon={<CircleAlert size={18} className="text-violet-600" />}
-          title="Rappels intelligents"
-        >
-          {todayFollowUps.length === 0 &&
-          dueFollowUps.length === 0 &&
-          urgentFollowUps.length === 0 &&
-          birthdaysToday.length === 0 &&
-          upcomingBirthdays.length === 0 &&
-          inactiveClients90.length === 0 ? (
-            <EmptyState text="Aucun rappel critique pour le moment." />
-          ) : (
-            <>
-              {birthdaysToday.map((client) => (
-                <ReminderItem
-                  key={`birthday-${client.id}`}
-                  tone="pink"
-                  onAction={() => setActiveView("clients")}
-                >
-                  🎂 Aujourd’hui : anniversaire de{" "}
-                  {[client.first_name, client.last_name]
-                    .filter(Boolean)
-                    .join(" ") || "Client"}
-                </ReminderItem>
-              ))}
+        <section className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <PriorityCard
+            title="Relances aujourd’hui"
+            value={loadingStats ? "..." : String(todayFollowUps.length)}
+            subtitle="À traiter immédiatement"
+            tone="orange"
+            emoji="🔥"
+          />
 
-              {upcomingBirthdays.slice(0, 3).map((client) => (
-                <ReminderItem
-                  key={`upcoming-birthday-${client.id}`}
-                  tone="fuchsia"
-                  onAction={() => setActiveView("clients")}
+          <PriorityCard
+            title="En retard"
+            value={loadingStats ? "..." : String(dueFollowUps.length)}
+            subtitle="Opportunités en danger"
+            tone="amber"
+            emoji="⚠️"
+          />
+
+          <PriorityCard
+            title="À recontacter maintenant"
+            value={loadingStats ? "..." : String(inactiveClients90.length)}
+            subtitle="Clients dormants à réveiller"
+            tone="cyan"
+            emoji="💡"
+          />
+        </section>
+
+        <section className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <DashboardCard
+            icon={<Flame size={18} className="text-orange-500" />}
+            title="Top clients chauds"
+          >
+            {hotClients.length === 0 ? (
+              <EmptyState text="Aucun client scoré pour le moment." />
+            ) : (
+              hotClients.map((client, index) => (
+                <div
+                  key={client.id}
+                  className="rounded-3xl border border-orange-100 bg-orange-50 p-4"
                 >
-                  <div className="flex items-center gap-2">
-                    <Cake size={14} />
-                    Anniversaire dans {client.daysLeft} jour(s) :{" "}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-slate-950">
+                        #{index + 1}{" "}
+                        {[client.first_name, client.last_name]
+                          .filter(Boolean)
+                          .join(" ") || "Client"}
+                      </p>
+
+                      <p className="mt-1 truncate text-xs font-medium text-orange-700">
+                        {client.group_name || "Sans groupe"} •{" "}
+                        {client.status || "prospect"}
+                      </p>
+                    </div>
+
+                    <span className="shrink-0 rounded-full bg-orange-200 px-3 py-1 text-xs font-black text-orange-900">
+                      {client.score ?? 0}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => openClientFromDashboard(client.id)}
+                    className="mt-3 text-xs font-black text-orange-700 hover:underline"
+                  >
+                    Ouvrir fiche →
+                  </button>
+                </div>
+              ))
+            )}
+          </DashboardCard>
+
+          <DashboardCard
+            icon={<CircleAlert size={18} className="text-violet-600" />}
+            title="Rappels intelligents"
+          >
+            {todayFollowUps.length === 0 &&
+            dueFollowUps.length === 0 &&
+            urgentFollowUps.length === 0 &&
+            birthdaysToday.length === 0 &&
+            upcomingBirthdays.length === 0 &&
+            inactiveClients90.length === 0 ? (
+              <EmptyState text="Aucun rappel critique pour le moment." />
+            ) : (
+              <>
+                {birthdaysToday.map((client) => (
+                  <ReminderItem
+                    key={`birthday-${client.id}`}
+                    tone="pink"
+                    onAction={() => openClientFromDashboard(client.id)}
+                  >
+                    🎂 Aujourd’hui : anniversaire de{" "}
                     {[client.first_name, client.last_name]
                       .filter(Boolean)
                       .join(" ") || "Client"}
-                  </div>
-                </ReminderItem>
-              ))}
+                  </ReminderItem>
+                ))}
 
-              {todayFollowUps.map((item) => (
-                <ReminderItem
-                  key={`today-${item.id}`}
-                  tone="slate"
-                  onAction={() => setActiveView("follow_ups")}
+                {upcomingBirthdays.slice(0, 3).map((client) => (
+                  <ReminderItem
+                    key={`upcoming-birthday-${client.id}`}
+                    tone="fuchsia"
+                    onAction={() => openClientFromDashboard(client.id)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Cake size={14} />
+                      Anniversaire dans {client.daysLeft} jour(s) :{" "}
+                      {[client.first_name, client.last_name]
+                        .filter(Boolean)
+                        .join(" ") || "Client"}
+                    </div>
+                  </ReminderItem>
+                ))}
+
+                {todayFollowUps.map((item) => (
+                  <ReminderItem
+                    key={`today-${item.id}`}
+                    tone="slate"
+                    onAction={() => setActiveView("follow_ups")}
+                  >
+                    Aujourd’hui : {item.title}
+                  </ReminderItem>
+                ))}
+
+                {dueFollowUps.slice(0, 3).map((item) => (
+                  <ReminderItem
+                    key={`due-${item.id}`}
+                    tone="amber"
+                    onAction={() => setActiveView("follow_ups")}
+                  >
+                    En retard : {item.title}
+                  </ReminderItem>
+                ))}
+
+                {urgentFollowUps.slice(0, 2).map((item) => (
+                  <ReminderItem
+                    key={`urgent-${item.id}`}
+                    tone="rose"
+                    onAction={() => setActiveView("follow_ups")}
+                  >
+                    Urgent : {item.title}
+                  </ReminderItem>
+                ))}
+
+                {inactiveClients90.slice(0, 3).map((client) => (
+                  <ReminderItem
+                    key={`inactive-${client.id}`}
+                    tone="sky"
+                    onAction={() => openClientFromDashboard(client.id)}
+                  >
+                    90+ jours sans activité récente :{" "}
+                    {[client.first_name, client.last_name]
+                      .filter(Boolean)
+                      .join(" ") || "Client"}
+                  </ReminderItem>
+                ))}
+              </>
+            )}
+          </DashboardCard>
+
+          <DashboardCard
+            icon={<Star size={18} className="text-cyan-600" />}
+            title="Relances prioritaires"
+          >
+            {dueFollowUps.length === 0 ? (
+              <EmptyState text="Aucune relance à traiter immédiatement." />
+            ) : (
+              dueFollowUps.slice(0, 4).map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm"
                 >
-                  Aujourd’hui : {item.title}
-                </ReminderItem>
-              ))}
+                  <p className="text-sm font-black text-slate-950">
+                    {item.title}
+                  </p>
 
-              {dueFollowUps.slice(0, 3).map((item) => (
-                <ReminderItem
-                  key={`due-${item.id}`}
-                  tone="amber"
-                  onAction={() => setActiveView("follow_ups")}
-                >
-                  En retard : {item.title}
-                </ReminderItem>
-              ))}
+                  <p className="mt-1 text-xs font-medium text-slate-500">
+                    {item.client_id
+                      ? clientMap.get(item.client_id) || "Client"
+                      : "Sans client lié"}
+                  </p>
 
-              {urgentFollowUps.slice(0, 2).map((item) => (
-                <ReminderItem
-                  key={`urgent-${item.id}`}
-                  tone="rose"
-                  onAction={() => setActiveView("follow_ups")}
-                >
-                  Urgent : {item.title}
-                </ReminderItem>
-              ))}
+                  <p className="mt-2 text-xs font-bold text-slate-400">
+                    {item.due_date
+                      ? new Date(item.due_date).toLocaleString("fr-FR")
+                      : "Sans date"}
+                  </p>
 
-              {inactiveClients90.slice(0, 3).map((client) => (
-                <ReminderItem
-                  key={`inactive-${client.id}`}
-                  tone="sky"
-                  onAction={() => setActiveView("clients")}
-                >
-                  90+ jours sans activité récente :{" "}
-                  {[client.first_name, client.last_name]
-                    .filter(Boolean)
-                    .join(" ") || "Client"}
-                </ReminderItem>
-              ))}
-            </>
-          )}
-        </DashboardCard>
-
-        <DashboardCard
-          icon={<Star size={18} className="text-cyan-600" />}
-          title="Relances prioritaires"
-        >
-          {dueFollowUps.length === 0 ? (
-            <EmptyState text="Aucune relance à traiter immédiatement." />
-          ) : (
-            dueFollowUps.slice(0, 4).map((item) => (
-              <div
-                key={item.id}
-                className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm"
-              >
-                <p className="text-sm font-black text-slate-950">
-                  {item.title}
-                </p>
-
-                <p className="mt-1 text-xs font-medium text-slate-500">
-                  {item.client_id
-                    ? clientMap.get(item.client_id) || "Client"
-                    : "Sans client lié"}
-                </p>
-
-                <p className="mt-2 text-xs font-bold text-slate-400">
-                  {item.due_date
-                    ? new Date(item.due_date).toLocaleString("fr-FR")
-                    : "Sans date"}
-                </p>
-
-                <button
-                  onClick={() => setActiveView("follow_ups")}
-                  className="mt-3 text-xs font-black text-violet-600 hover:underline"
-                >
-                  Traiter la relance →
-                </button>
-              </div>
-            ))
-          )}
-        </DashboardCard>
-      </section>
+                  <button
+                    onClick={() => setActiveView("follow_ups")}
+                    className="mt-3 text-xs font-black text-violet-600 hover:underline"
+                  >
+                    Traiter la relance →
+                  </button>
+                </div>
+              ))
+            )}
+          </DashboardCard>
+        </section>
+      </div>
     </AppShell>
   );
 }
@@ -725,29 +771,35 @@ function AppShell({
       <div className="pointer-events-none fixed left-[-90px] top-[-90px] h-72 w-72 rounded-full bg-violet-300/30 blur-3xl" />
       <div className="pointer-events-none fixed bottom-[-110px] right-[-110px] h-80 w-80 rounded-full bg-cyan-300/30 blur-3xl" />
 
-      <div className="relative mx-auto flex min-h-screen max-w-[1600px]">
+      <div className="relative mx-auto flex min-h-screen max-w-[1680px]">
         <Sidebar activeView={activeView} setActiveView={setActiveView} />
 
-        <main className="w-full flex-1 px-4 pb-28 pt-5 md:px-6 lg:pb-8 xl:p-8">
+        <main className="w-full min-w-0 flex-1 px-4 pb-28 pt-4 sm:px-5 md:px-6 lg:pb-8 lg:pt-6 xl:px-8">
+          <MobileTopBar
+            activeView={activeView}
+            setActiveView={setActiveView}
+            handleLogout={handleLogout}
+          />
+
           {activeView !== "home" && (
-            <div className="mb-6 flex flex-wrap gap-3">
+            <div className="mx-auto mb-5 flex w-full max-w-7xl flex-wrap gap-3">
               <button
                 onClick={() => setActiveView("home")}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:text-slate-950"
+                className="rounded-2xl border border-slate-200 bg-white/85 px-4 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:text-slate-950"
               >
                 Retour dashboard
               </button>
 
               <button
                 onClick={handleLogout}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:text-slate-950"
+                className="hidden rounded-2xl border border-slate-200 bg-white/85 px-4 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:text-slate-950 sm:inline-flex"
               >
                 Déconnexion
               </button>
             </div>
           )}
 
-          {children}
+          <div className="min-w-0">{children}</div>
         </main>
       </div>
 
@@ -763,8 +815,8 @@ type SidebarProps = {
 
 function Sidebar({ activeView, setActiveView }: SidebarProps) {
   return (
-    <aside className="hidden w-80 shrink-0 border-r border-white/70 bg-white/55 p-6 shadow-2xl shadow-violet-100 backdrop-blur-2xl lg:block">
-      <div className="rounded-[2rem] bg-slate-950 p-5 text-white">
+    <aside className="sticky top-0 hidden h-screen w-80 shrink-0 overflow-y-auto border-r border-white/70 bg-white/55 p-6 shadow-2xl shadow-violet-100 backdrop-blur-2xl lg:block">
+      <div className="rounded-[2rem] bg-slate-950 p-5 text-white shadow-2xl shadow-slate-300/40">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-500 to-cyan-400 text-white">
             <Sparkles size={20} />
@@ -800,7 +852,7 @@ function Sidebar({ activeView, setActiveView }: SidebarProps) {
             <button
               key={item.view}
               onClick={() => setActiveView(item.view)}
-              className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-black transition ${
+              className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-black transition active:scale-[0.98] ${
                 active
                   ? "bg-slate-950 text-white shadow-xl shadow-slate-300"
                   : "bg-white/70 text-slate-600 hover:bg-white hover:text-slate-950"
@@ -816,10 +868,50 @@ function Sidebar({ activeView, setActiveView }: SidebarProps) {
   );
 }
 
+function MobileTopBar({
+  activeView,
+  setActiveView,
+  handleLogout,
+}: SidebarProps & {
+  handleLogout: () => Promise<void>;
+}) {
+  const currentItem = navItems.find((item) => item.view === activeView);
+  const CurrentIcon = currentItem?.icon || LayoutDashboard;
+
+  return (
+    <div className="mb-4 flex items-center justify-between gap-3 rounded-[1.5rem] border border-white/80 bg-white/80 p-3 shadow-xl shadow-violet-100 backdrop-blur-2xl lg:hidden">
+      <button
+        onClick={() => setActiveView("home")}
+        className="flex min-w-0 items-center gap-3"
+      >
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white">
+          <Sparkles size={19} />
+        </div>
+
+        <div className="min-w-0 text-left">
+          <p className="truncate text-sm font-black text-slate-950">MyPX</p>
+          <p className="flex items-center gap-1 truncate text-xs font-bold text-slate-500">
+            <CurrentIcon size={13} />
+            {currentItem?.label || "Dashboard"}
+          </p>
+        </div>
+      </button>
+
+      <button
+        onClick={handleLogout}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm"
+        aria-label="Déconnexion"
+      >
+        <LogOut size={18} />
+      </button>
+    </div>
+  );
+}
+
 function MobileNav({ activeView, setActiveView }: SidebarProps) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/75 bg-white/85 px-2 py-2 shadow-2xl backdrop-blur-2xl lg:hidden">
-      <div className="mx-auto grid max-w-xl grid-cols-6 gap-1">
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/75 bg-white/90 px-2 py-2 shadow-2xl backdrop-blur-2xl lg:hidden">
+      <div className="mx-auto flex max-w-xl gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = activeView === item.view;
@@ -828,14 +920,14 @@ function MobileNav({ activeView, setActiveView }: SidebarProps) {
             <button
               key={item.view}
               onClick={() => setActiveView(item.view)}
-              className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[10px] font-black transition ${
+              className={`flex min-w-[76px] flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[10px] font-black transition active:scale-[0.97] ${
                 active
-                  ? "bg-slate-950 text-white"
+                  ? "bg-slate-950 text-white shadow-lg shadow-slate-300"
                   : "text-slate-500 hover:bg-slate-100"
               }`}
             >
               <Icon size={17} />
-              <span className="truncate">{item.label}</span>
+              <span className="max-w-[70px] truncate">{item.label}</span>
             </button>
           );
         })}
@@ -854,7 +946,7 @@ function DashboardCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[2rem] border border-white/75 bg-white/70 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:p-6">
+    <div className="rounded-[1.75rem] border border-white/80 bg-white/75 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:rounded-[2rem] sm:p-6">
       <div className="flex items-center gap-2">
         {icon}
         <p className="text-sm font-black text-slate-800">{title}</p>
@@ -892,7 +984,7 @@ function PriorityCard({
 
   return (
     <div
-      className={`rounded-[2rem] border p-5 shadow-xl transition hover:-translate-y-1 ${classes[tone]}`}
+      className={`rounded-[1.75rem] border p-5 shadow-xl transition hover:-translate-y-1 sm:rounded-[2rem] ${classes[tone]}`}
     >
       <div
         className={`flex items-center gap-2 text-sm font-black ${subClasses[tone]}`}
@@ -936,7 +1028,7 @@ function ReminderItem({
 
   return (
     <div
-      className={`rounded-3xl border p-4 text-sm font-bold ${classes[tone]}`}
+      className={`rounded-3xl border p-4 text-sm font-bold leading-6 ${classes[tone]}`}
     >
       {children}
 
