@@ -108,7 +108,7 @@ function hexToDummyImageColor(hex: string) {
 }
 
 export default function WelcomeBuilder({ session }: WelcomeBuilderProps) {
-  const [template, setTemplate] = useState<WelcomeTemplate | null>(null);
+  const [, setTemplate] = useState<WelcomeTemplate | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingTemplate, setLoadingTemplate] = useState(true);
 
@@ -222,7 +222,6 @@ export default function WelcomeBuilder({ session }: WelcomeBuilderProps) {
     }
 
     if (templateData) {
-      setTemplate(templateData as WelcomeTemplate);
       setSubject(templateData.subject || defaultSubject);
     }
 
