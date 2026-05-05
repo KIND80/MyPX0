@@ -108,7 +108,6 @@ function hexToDummyImageColor(hex: string) {
 }
 
 export default function WelcomeBuilder({ session }: WelcomeBuilderProps) {
-  const [, setTemplate] = useState<WelcomeTemplate | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingTemplate, setLoadingTemplate] = useState(true);
 
