@@ -21,16 +21,6 @@ type WelcomeBuilderProps = {
   session: Session;
 };
 
-type WelcomeTemplate = {
-  id: string;
-  user_id: string;
-  name: string;
-  type: string;
-  subject: string | null;
-  content: string | null;
-  is_active: boolean | null;
-};
-
 type UserOnboarding = {
   company_name: string | null;
   company_email: string | null;
