@@ -429,32 +429,64 @@ ${customIntroText}
 
     setLoading(true);
 
-    const payload = {
+    const htmlContent = generateHtml(safeContent);
+
+    const onboardingPayload = {
+      user_id: session.user.id,
+      company_name: companyName,
+      company_email: companyEmail,
+      company_phone: companyPhone,
+      company_website: companyWebsite,
+      company_address: companyAddress,
+      logo_url: logoUrl,
+      main_color: brandColor,
+      advisor_name: advisorName,
+      advisor_role: advisorRole,
+      advisor_photo_url: advisorPhotoUrl,
+      whatsapp_url: whatsappUrl,
+      booking_url: bookingUrl,
+      welcome_subject: safeSubject,
+      welcome_content: safeContent,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: onboardingError } = await supabase
+      .from("user_onboarding")
+      .upsert(onboardingPayload, {
+        onConflict: "user_id",
+      });
+
+    if (onboardingError) {
+      setLoading(false);
+      alert(onboardingError.message);
+      return;
+    }
+
+    const templatePayload = {
       user_id: session.user.id,
       name: "Template bienvenue premium",
       type: "welcome_email",
       subject: safeSubject,
-      content: generateHtml(safeContent),
+      content: htmlContent,
       is_active: true,
+      updated_at: new Date().toISOString(),
     };
 
-    const response = template?.id
-      ? await supabase
-          .from("email_templates")
-          .update(payload)
-          .eq("id", template.id)
-          .eq("user_id", session.user.id)
-      : await supabase.from("email_templates").insert(payload);
+    const { error: templateError } = await supabase
+      .from("email_templates")
+      .upsert(templatePayload, {
+        onConflict: "user_id,type",
+      });
 
     setLoading(false);
 
-    if (response.error) {
-      alert(response.error.message);
+    if (templateError) {
+      alert(templateError.message);
       return;
     }
 
     await fetchData();
-    alert("Template de bienvenue enregistré.");
+    alert("Template de bienvenue enregistré ✅");
   };
 
   const previewSubject = replaceVars(subject);
