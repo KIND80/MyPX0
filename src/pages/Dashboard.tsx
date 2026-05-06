@@ -36,12 +36,7 @@ type DashboardProps = {
   session: Session;
 };
 
-type ActiveView =
-  | "home"
-  | "clients"
-  | "email_hub"
-  | "radar_ai"
-  | "settings";
+type ActiveView = "home" | "clients" | "email_hub" | "radar_ai" | "settings";
 
 type ClientRow = {
   id: string;
@@ -204,7 +199,7 @@ export default function Dashboard({ session }: DashboardProps) {
 
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [followUps, setFollowUps] = useState<FollowUpRow[]>([]);
-  const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
+  const [, setCampaigns] = useState<CampaignRow[]>([]);
   const [unreadEmails, setUnreadEmails] = useState(0);
   const [loadingStats, setLoadingStats] = useState(true);
 
@@ -539,7 +534,8 @@ export default function Dashboard({ session }: DashboardProps) {
               <button
                 key={item.label}
                 onClick={() => {
-                  if (item.label === "Emails non lus") setActiveView("email_hub");
+                  if (item.label === "Emails non lus")
+                    setActiveView("email_hub");
                   if (item.label === "Clients") setActiveView("clients");
                   if (item.label === "Relances dues") setActiveView("clients");
                 }}

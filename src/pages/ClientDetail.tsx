@@ -321,32 +321,36 @@ export default function ClientDetail({
       score: calculateScore(clientData as Client),
     };
 
-    const [{ data: emailLogs }, { data: inboundEmails }, { data: notes }, { data: followUps }] =
-      await Promise.all([
-        supabase
-          .from("email_logs")
-          .select("*")
-          .eq("client_id", clientId)
-          .eq("user_id", session.user.id),
+    const [
+      { data: emailLogs },
+      { data: inboundEmails },
+      { data: notes },
+      { data: followUps },
+    ] = await Promise.all([
+      supabase
+        .from("email_logs")
+        .select("*")
+        .eq("client_id", clientId)
+        .eq("user_id", session.user.id),
 
-        supabase
-          .from("inbound_emails")
-          .select("*")
-          .eq("client_id", clientId)
-          .eq("user_id", session.user.id),
+      supabase
+        .from("inbound_emails")
+        .select("*")
+        .eq("client_id", clientId)
+        .eq("user_id", session.user.id),
 
-        supabase
-          .from("client_notes")
-          .select("*")
-          .eq("client_id", clientId)
-          .eq("user_id", session.user.id),
+      supabase
+        .from("client_notes")
+        .select("*")
+        .eq("client_id", clientId)
+        .eq("user_id", session.user.id),
 
-        supabase
-          .from("follow_ups")
-          .select("*")
-          .eq("client_id", clientId)
-          .eq("user_id", session.user.id),
-      ]);
+      supabase
+        .from("follow_ups")
+        .select("*")
+        .eq("client_id", clientId)
+        .eq("user_id", session.user.id),
+    ]);
 
     const emailItems: TimelineItem[] =
       emailLogs?.map((item) => ({
@@ -800,7 +804,313 @@ export default function ClientDetail({
         Retour clients
       </button>
 
-      {/* GARDE TOUT TON JSX EXISTANT ICI JUSQU’À LA TIMELINE */}
+      <section className="rounded-[2rem] border border-white/75 bg-white/70 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:p-6">
+        <SectionHeader
+          icon={<User size={16} />}
+          eyebrow="Fiche client"
+          title={fullName}
+          description="Gère les informations, notes, relances, emails et opportunités IA du client."
+          action={
+            <button
+              onClick={saveClient}
+              disabled={savingClient}
+              className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-300 disabled:opacity-60"
+            >
+              {savingClient ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Save size={16} />
+              )}
+              Enregistrer
+            </button>
+          }
+        />
+
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <ScoreCard
+            icon={<Sparkles size={16} />}
+            label="Score client"
+            value={client.score || 0}
+            sub="Score commercial calculé"
+            tone="emerald"
+          />
+          <ScoreCard
+            icon={<Bot size={16} />}
+            label="Score IA"
+            value={client.ai_score || 0}
+            sub={client.ai_status || "Non analysé"}
+            tone="cyan"
+          />
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <FieldInput
+            icon={<User size={14} />}
+            value={client.first_name || ""}
+            onChange={(v) => updateClientField("first_name", v)}
+            placeholder="Prénom"
+          />
+          <FieldInput
+            icon={<User size={14} />}
+            value={client.last_name || ""}
+            onChange={(v) => updateClientField("last_name", v)}
+            placeholder="Nom"
+          />
+          <FieldInput
+            icon={<Mail size={14} />}
+            value={client.email || ""}
+            onChange={(v) => updateClientField("email", v)}
+            placeholder="Email"
+          />
+          <FieldInput
+            icon={<Phone size={14} />}
+            value={client.phone || ""}
+            onChange={(v) => updateClientField("phone", v)}
+            placeholder="Téléphone"
+          />
+          <FieldInput
+            icon={<Building2 size={14} />}
+            value={client.company || ""}
+            onChange={(v) => updateClientField("company", v)}
+            placeholder="Entreprise"
+          />
+          <FieldInput
+            icon={<MapPin size={14} />}
+            value={client.city || ""}
+            onChange={(v) => updateClientField("city", v)}
+            placeholder="Ville"
+          />
+          <FieldInput
+            icon={<CalendarDays size={14} />}
+            value={client.birthday || ""}
+            onChange={(v) => updateClientField("birthday", v)}
+            placeholder="Date anniversaire"
+            type="date"
+          />
+          <FieldInput
+            icon={<Euro size={14} />}
+            value={client.potential_amount?.toString() || ""}
+            onChange={(v) => updateClientField("potential_amount", v)}
+            placeholder="Potentiel commercial"
+            type="number"
+          />
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+              Statut
+            </label>
+            <select
+              value={client.status || ""}
+              onChange={(e) => updateClientField("status", e.target.value)}
+              className="w-full bg-transparent text-sm font-semibold text-slate-950 outline-none"
+            >
+              <option value="">Non défini</option>
+              <option value="prospect">Prospect</option>
+              <option value="client">Client</option>
+              <option value="chaud">Chaud</option>
+              <option value="a_relancer">À relancer</option>
+            </select>
+          </div>
+
+          <FieldInput
+            icon={<Inbox size={14} />}
+            value={client.group_name || ""}
+            onChange={(v) => updateClientField("group_name", v)}
+            placeholder="Groupe"
+          />
+        </div>
+
+        <div className="mt-4">
+          <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+            Notes internes client
+          </label>
+          <textarea
+            value={client.notes || ""}
+            onChange={(e) => updateClientField("notes", e.target.value)}
+            rows={4}
+            className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+            placeholder="Notes générales sur ce client..."
+          />
+        </div>
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <ActionPanel
+          icon={<StickyNote size={18} />}
+          title="Ajouter une note"
+          description="Ajoute un échange, une information ou un commentaire dans la timeline."
+        >
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={4}
+            className="mt-4 w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium outline-none focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+            placeholder="Écris ta note ici..."
+          />
+          <button
+            onClick={addNote}
+            className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-200"
+          >
+            <Plus size={16} />
+            Ajouter la note
+          </button>
+        </ActionPanel>
+
+        <ActionPanel
+          icon={<Bell size={18} />}
+          title="Créer une relance"
+          description="Programme une relance rapide ou personnalisée pour ce client."
+        >
+          <div className="mt-4 space-y-3">
+            <button
+              onClick={createQuickFollowUp}
+              className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-300"
+            >
+              <CalendarDays size={16} />
+              Relance demain
+            </button>
+
+            <FieldInput
+              icon={<CalendarDays size={14} />}
+              value={followUpDate}
+              onChange={setFollowUpDate}
+              placeholder="Date de relance"
+              type="datetime-local"
+            />
+            <FieldInput
+              icon={<Bell size={14} />}
+              value={followUpTitle}
+              onChange={setFollowUpTitle}
+              placeholder="Titre de relance"
+            />
+
+            <textarea
+              value={followUpNote}
+              onChange={(e) => setFollowUpNote(e.target.value)}
+              rows={3}
+              className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium outline-none focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+              placeholder="Note de relance..."
+            />
+
+            <button
+              onClick={createCustomFollowUp}
+              disabled={savingFollowUp}
+              className="inline-flex items-center gap-2 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 disabled:opacity-60"
+            >
+              {savingFollowUp ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Plus size={16} />
+              )}
+              Créer la relance
+            </button>
+          </div>
+        </ActionPanel>
+      </div>
+
+      <ActionPanel
+        icon={<Bot size={18} />}
+        title="Radar IA"
+        description="Analyse le client et trouve un angle de conversation utile."
+      >
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <button
+            onClick={enrichClientWithAI}
+            disabled={enrichingAI}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-cyan-200 disabled:opacity-60"
+          >
+            {enrichingAI ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Sparkles size={16} />
+            )}
+            Enrichir avec IA
+          </button>
+
+          <button
+            onClick={findConversationOpportunity}
+            disabled={findingOpportunity}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-300 disabled:opacity-60"
+          >
+            {findingOpportunity ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Lightbulb size={16} />
+            )}
+            Trouver une opportunité
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <InfoCard title="Résumé IA">
+            {client.ai_summary ||
+              "Aucune analyse IA disponible pour le moment."}
+          </InfoCard>
+          <InfoCard title="Prochaine action">
+            {client.next_best_action ||
+              "Aucune action recommandée pour le moment."}
+          </InfoCard>
+        </div>
+
+        {conversationOpportunity && (
+          <div className="mt-4 rounded-3xl border border-cyan-100 bg-cyan-50 p-4">
+            <p className="text-sm font-black text-slate-950">
+              {conversationOpportunity.angle}
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              {conversationOpportunity.reason}
+            </p>
+            <div className="mt-3 rounded-2xl bg-white p-4 text-sm leading-6 text-slate-700">
+              {conversationOpportunity.message}
+            </div>
+            <button
+              onClick={() => setEmailContent(conversationOpportunity.message)}
+              className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-cyan-700 px-4 py-3 text-xs font-black text-white"
+            >
+              <Copy size={14} />
+              Utiliser ce message
+            </button>
+          </div>
+        )}
+      </ActionPanel>
+
+      <ActionPanel
+        icon={<Send size={18} />}
+        title="Envoyer un email"
+        description="Envoie un email manuel avec la signature automatique MyPX."
+      >
+        <div className="mt-4 space-y-3">
+          <FieldInput
+            icon={<Mail size={14} />}
+            value={emailSubject}
+            onChange={setEmailSubject}
+            placeholder="Sujet de l’email"
+          />
+
+          <textarea
+            value={emailContent}
+            onChange={(e) => setEmailContent(e.target.value)}
+            rows={7}
+            className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium outline-none focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+            placeholder="Message à envoyer..."
+          />
+
+          <button
+            onClick={sendManualEmail}
+            disabled={sendingEmail}
+            className="inline-flex items-center gap-2 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 disabled:opacity-60"
+          >
+            {sendingEmail ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Send size={16} />
+            )}
+            Envoyer l’email
+          </button>
+        </div>
+      </ActionPanel>
 
       <section className="rounded-[2rem] border border-white/75 bg-white/70 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:p-6">
         <div className="flex items-center gap-2">
