@@ -74,10 +74,17 @@ const SUPABASE_FUNCTIONS_BASE =
   "https://jithpgooytpypqsmhfzy.supabase.co/functions/v1";
 
 const badgeMap: Record<string, string> = {
-  draft: "bg-slate-50 text-slate-600 border-slate-100",
-  scheduled: "bg-sky-50 text-sky-700 border-sky-100",
-  ready: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  sent: "bg-violet-50 text-violet-700 border-violet-100",
+  draft: "bg-slate-900/70 text-slate-200 border-white/10",
+  scheduled: "bg-sky-500/10 text-sky-200 border-sky-400/20",
+  ready: "bg-emerald-500/10 text-emerald-200 border-emerald-400/20",
+  sent: "bg-violet-500/10 text-violet-200 border-violet-400/20",
+};
+
+const statusLabel: Record<string, string> = {
+  draft: "Préparation",
+  scheduled: "Planifiée",
+  ready: "Prête",
+  sent: "Déployée",
 };
 
 function addTrackingToHtml(html: string, logId: string) {
@@ -243,7 +250,7 @@ export default function Campaigns({ session }: CampaignsProps) {
   };
 
   const handleDeleteCampaign = async (campaignId: string) => {
-    if (!confirm("Supprimer cette campagne ?")) return;
+    if (!confirm("Supprimer cette opération ?")) return;
 
     const { error } = await supabase
       .from("campaigns")
@@ -295,7 +302,7 @@ export default function Campaigns({ session }: CampaignsProps) {
 
   const handleSendCampaign = async (campaign: Campaign) => {
     if (!campaign.subject || !campaign.content) {
-      alert("La campagne doit avoir un sujet et un contenu.");
+      alert("L’opération doit avoir un sujet et un contenu.");
       return;
     }
 
@@ -303,7 +310,7 @@ export default function Campaigns({ session }: CampaignsProps) {
 
     if (campaign.target_type === "client") {
       if (!campaign.target_client_id) {
-        alert("Choisis un client avant d’envoyer.");
+        alert("Choisis un dossier avant de déployer l’approche.");
         return;
       }
 
@@ -312,7 +319,7 @@ export default function Campaigns({ session }: CampaignsProps) {
       );
     } else {
       if (!campaign.target_group) {
-        alert("Choisis un groupe cible avant d’envoyer.");
+        alert("Choisis un réseau cible avant de déployer l’opération.");
         return;
       }
 
@@ -326,14 +333,14 @@ export default function Campaigns({ session }: CampaignsProps) {
     }
 
     if (targetedClients.length === 0) {
-      alert("Aucun client avec email trouvé pour ce ciblage.");
+      alert("Aucun dossier avec email trouvé pour ce ciblage.");
       return;
     }
 
     const confirmSend = confirm(
       campaign.target_type === "client"
-        ? "Envoyer cet email à ce client ?"
-        : `Envoyer cette campagne à ${targetedClients.length} client(s) ? Chaque client recevra un email séparé et privé.`
+        ? "Déployer cette approche vers ce dossier ?"
+        : `Déployer cette opération vers ${targetedClients.length} dossier(s) ? Chaque contact recevra un email séparé et privé.`
     );
 
     if (!confirmSend) return;
@@ -424,7 +431,7 @@ export default function Campaigns({ session }: CampaignsProps) {
     setSendingId(null);
 
     alert(
-      `Campagne terminée : ${successCount} envoyé(s), ${failedCount} échec(s).`
+      `Opération terminée : ${successCount} transmission(s) envoyée(s), ${failedCount} échec(s).`
     );
 
     fetchCampaigns();
@@ -447,19 +454,26 @@ export default function Campaigns({ session }: CampaignsProps) {
   }, [campaigns, search]);
 
   const targetedClients = useMemo(() => {
+    if (form.target_type === "client") {
+      return clients.filter(
+        (client) => client.id === form.target_client_id && client.email
+      );
+    }
+
     if (!form.target_group) return [];
 
     return clients.filter(
       (client) =>
+        client.email &&
         client.group_name &&
         client.group_name.toLowerCase() === form.target_group.toLowerCase()
     );
-  }, [clients, form.target_group]);
+  }, [clients, form.target_client_id, form.target_group, form.target_type]);
 
   const previewText = useMemo(() => {
     const sample = targetedClients[0];
     const firstName = sample?.first_name || "Prénom";
-    const groupName = form.target_group || "Groupe";
+    const groupName = sample?.group_name || form.target_group || "Réseau";
 
     return (form.content || "")
       .split("{{first_name}}")
@@ -476,75 +490,80 @@ export default function Campaigns({ session }: CampaignsProps) {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-violet-700">
-            <Megaphone size={14} />
-            Animation portefeuille
+    <div className="space-y-6 text-white">
+      <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#0B1020] p-5 shadow-2xl shadow-violet-950/30 sm:p-7">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-violet-600/20 blur-3xl" />
+        <div className="absolute -bottom-24 left-10 h-72 w-72 rounded-full bg-blue-600/10 blur-3xl" />
+
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/20 bg-violet-500/10 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-violet-200">
+              <Megaphone size={14} />
+              Opérations relationnelles
+            </div>
+
+            <h2 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">
+              Centre des opérations
+            </h2>
+
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-300">
+              PX Sentinel t’aide à structurer tes approches, cibler les bons
+              réseaux et suivre les transmissions envoyées à ton portefeuille.
+            </p>
           </div>
 
-          <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950">
-            Campagnes
-          </h2>
-
-          <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
-            Crée des campagnes ciblées par groupe pour animer ton portefeuille
-            client et suivre les ouvertures / clics.
-          </p>
+          <button
+            onClick={() => {
+              setForm(initialForm);
+              setShowModal(true);
+            }}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 shadow-xl shadow-violet-950/30 transition hover:-translate-y-0.5 hover:bg-violet-100"
+          >
+            <Plus size={16} />
+            Lancer une opération
+          </button>
         </div>
-
-        <button
-          onClick={() => {
-            setForm(initialForm);
-            setShowModal(true);
-          }}
-          className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300 transition hover:-translate-y-0.5 hover:bg-black"
-        >
-          <Plus size={16} />
-          Nouvelle campagne
-        </button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
-        <StatCard label="Campagnes totales" value={campaigns.length} />
-        <StatCard label="Prêtes à envoyer" value={readyCount} tone="emerald" />
-        <StatCard label="Envoyées" value={sentCount} tone="violet" />
-        <StatCard label="Emails envoyés" value={totalSent} tone="cyan" />
+        <StatCard label="Opérations totales" value={campaigns.length} />
+        <StatCard label="Prêtes à déployer" value={readyCount} tone="emerald" />
+        <StatCard label="Déployées" value={sentCount} tone="violet" />
+        <StatCard label="Transmissions envoyées" value={totalSent} tone="cyan" />
       </div>
 
-      <div className="rounded-[2rem] border border-white/75 bg-white/70 p-4 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl">
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-violet-300 focus-within:ring-4 focus-within:ring-violet-100">
+      <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 shadow-2xl shadow-violet-950/20 backdrop-blur-2xl">
+        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#121A2F]/80 px-4 py-3 shadow-sm transition focus-within:border-violet-400/40 focus-within:ring-4 focus-within:ring-violet-500/10">
           <Search size={16} className="text-slate-400" />
           <input
             type="text"
-            placeholder="Rechercher une campagne, un groupe, un statut..."
+            placeholder="Rechercher une opération, un réseau, un statut..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-transparent text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300"
+            className="w-full bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-500"
           />
         </div>
       </div>
 
-      <div className="rounded-[2rem] border border-white/75 bg-white/70 p-4 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl">
+      <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 shadow-2xl shadow-violet-950/20 backdrop-blur-2xl">
         {loadingCampaigns ? (
-          <div className="flex items-center justify-center gap-3 py-10 text-sm font-bold text-slate-500">
+          <div className="flex items-center justify-center gap-3 py-10 text-sm font-bold text-slate-300">
             <Loader2 size={18} className="animate-spin" />
-            Chargement des campagnes...
+            PX Sentinel charge les opérations...
           </div>
         ) : filteredCampaigns.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-            <div className="rounded-3xl bg-slate-950 p-4 text-white shadow-lg shadow-slate-300">
+            <div className="rounded-3xl bg-violet-600 p-4 text-white shadow-lg shadow-violet-900/40">
               <Megaphone size={26} />
             </div>
 
-            <h3 className="text-lg font-black text-slate-950">
-              Aucune campagne pour le moment
+            <h3 className="text-lg font-black text-white">
+              Aucune opération active
             </h3>
 
-            <p className="max-w-md text-sm leading-6 text-slate-500">
-              Crée ta première campagne pour commencer à structurer l’animation
-              commerciale de tes groupes clients.
+            <p className="max-w-md text-sm leading-6 text-slate-400">
+              Crée ta première opération pour transformer une simple campagne en
+              approche stratégique ciblée.
             </p>
 
             <button
@@ -552,9 +571,9 @@ export default function Campaigns({ session }: CampaignsProps) {
                 setForm(initialForm);
                 setShowModal(true);
               }}
-              className="mt-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300"
+              className="mt-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 shadow-xl shadow-violet-950/30"
             >
-              Créer une campagne
+              Créer une opération
             </button>
           </div>
         ) : (
@@ -573,12 +592,12 @@ export default function Campaigns({ session }: CampaignsProps) {
             </div>
 
             <div className="hidden overflow-x-auto lg:block">
-              <table className="min-w-full text-left text-sm text-slate-600">
-                <thead className="text-xs uppercase tracking-[0.18em] text-slate-400">
+              <table className="min-w-full text-left text-sm text-slate-300">
+                <thead className="text-xs uppercase tracking-[0.18em] text-slate-500">
                   <tr>
-                    <th className="px-4 py-4">Nom</th>
-                    <th className="px-4 py-4">Sujet</th>
-                    <th className="px-4 py-4">Groupe cible</th>
+                    <th className="px-4 py-4">Opération</th>
+                    <th className="px-4 py-4">Approche</th>
+                    <th className="px-4 py-4">Réseau cible</th>
                     <th className="px-4 py-4">Statut</th>
                     <th className="px-4 py-4">Envoyés</th>
                     <th className="px-4 py-4">Ouverture</th>
@@ -591,18 +610,20 @@ export default function Campaigns({ session }: CampaignsProps) {
                   {filteredCampaigns.map((campaign) => (
                     <tr
                       key={campaign.id}
-                      className="border-t border-slate-100 transition hover:bg-violet-50/50"
+                      className="border-t border-white/10 transition hover:bg-violet-500/5"
                     >
-                      <td className="px-4 py-4 font-black text-slate-950">
+                      <td className="px-4 py-4 font-black text-white">
                         {campaign.name}
                       </td>
                       <td className="px-4 py-4">{campaign.subject || "—"}</td>
                       <td className="px-4 py-4">
-                        {campaign.target_group || "—"}
+                        {campaign.target_type === "client"
+                          ? "Dossier ciblé"
+                          : campaign.target_group || "—"}
                       </td>
                       <td className="px-4 py-4">
                         <Badge
-                          value={campaign.status || "draft"}
+                          value={statusLabel[campaign.status || "draft"]}
                           className={
                             badgeMap[campaign.status || "draft"] ||
                             badgeMap.draft
@@ -616,7 +637,7 @@ export default function Campaigns({ session }: CampaignsProps) {
                         <div className="flex flex-wrap gap-2">
                           <button
                             onClick={() => handleEditCampaign(campaign)}
-                            className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 shadow-sm hover:text-slate-950"
+                            className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black text-slate-200 shadow-sm hover:bg-white/10 hover:text-white"
                           >
                             <Pencil size={14} />
                             Modifier
@@ -626,7 +647,7 @@ export default function Campaigns({ session }: CampaignsProps) {
                             <button
                               onClick={() => handleSendCampaign(campaign)}
                               disabled={sendingId === campaign.id}
-                              className="inline-flex items-center gap-1 rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white disabled:opacity-60"
+                              className="inline-flex items-center gap-1 rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white transition hover:bg-violet-500 disabled:opacity-60"
                             >
                               {sendingId === campaign.id ? (
                                 <Loader2 size={14} className="animate-spin" />
@@ -634,14 +655,14 @@ export default function Campaigns({ session }: CampaignsProps) {
                                 <Play size={14} />
                               )}
                               {sendingId === campaign.id
-                                ? "Envoi..."
-                                : "Envoyer"}
+                                ? "Déploiement..."
+                                : "Déployer"}
                             </button>
                           )}
 
                           <button
                             onClick={() => handleDeleteCampaign(campaign.id)}
-                            className="inline-flex items-center gap-1 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 hover:bg-rose-100"
+                            className="inline-flex items-center gap-1 rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-xs font-black text-rose-200 hover:bg-rose-500/20"
                           >
                             <Trash2 size={14} />
                             Supprimer
@@ -658,28 +679,28 @@ export default function Campaigns({ session }: CampaignsProps) {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-          <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-[2rem] border border-white/75 bg-white/90 p-5 shadow-2xl shadow-violet-300/40 backdrop-blur-2xl sm:p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-md sm:p-4">
+          <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-[2rem] border border-white/10 bg-[#0B1020]/95 p-5 text-white shadow-2xl shadow-violet-950/50 backdrop-blur-2xl sm:p-6">
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-violet-700">
+                <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-violet-200">
                   <MailPlus size={14} />
-                  Builder campagne
+                  Builder d’opération
                 </div>
 
-                <h3 className="mt-3 text-2xl font-black text-slate-950">
-                  {form.id ? "Modifier la campagne" : "Créer une campagne"}
+                <h3 className="mt-3 text-2xl font-black text-white">
+                  {form.id ? "Modifier l’opération" : "Créer une opération"}
                 </h3>
 
-                <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Prépare un message ciblé, choisis ton groupe et visualise le
-                  rendu dynamique.
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Prépare une approche ciblée, choisis ton réseau et visualise
+                  le message avant déploiement.
                 </p>
               </div>
 
               <button
                 onClick={resetModal}
-                className="rounded-2xl border border-slate-200 bg-white p-3 text-slate-500 transition hover:text-slate-950"
+                className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-300 transition hover:bg-white/10 hover:text-white"
               >
                 <X size={18} />
               </button>
@@ -689,7 +710,7 @@ export default function Campaigns({ session }: CampaignsProps) {
               <form onSubmit={handleSaveCampaign} className="space-y-4">
                 <Input
                   name="name"
-                  placeholder="Nom de la campagne"
+                  placeholder="Nom de l’opération"
                   value={form.name}
                   onChange={handleChange}
                   required
@@ -700,21 +721,21 @@ export default function Campaigns({ session }: CampaignsProps) {
                     name="target_type"
                     value={form.target_type}
                     onChange={handleChange}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+                    className="rounded-2xl border border-white/10 bg-[#121A2F] px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-violet-400/40 focus:ring-4 focus:ring-violet-500/10"
                   >
-                    <option value="group">Envoyer à un groupe</option>
-                    <option value="client">Envoyer à un client précis</option>
+                    <option value="group">Déployer vers un réseau</option>
+                    <option value="client">Déployer vers un dossier précis</option>
                   </select>
 
                   <select
                     name="status"
                     value={form.status}
                     onChange={handleChange}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+                    className="rounded-2xl border border-white/10 bg-[#121A2F] px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-violet-400/40 focus:ring-4 focus:ring-violet-500/10"
                   >
-                    <option value="draft">Brouillon</option>
-                    <option value="scheduled">Programmée</option>
-                    <option value="ready">Prête à envoyer</option>
+                    <option value="draft">Préparation</option>
+                    <option value="scheduled">Planifiée</option>
+                    <option value="ready">Prête à déployer</option>
                   </select>
                 </div>
 
@@ -723,9 +744,9 @@ export default function Campaigns({ session }: CampaignsProps) {
                     name="target_group"
                     value={form.target_group}
                     onChange={handleChange}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+                    className="w-full rounded-2xl border border-white/10 bg-[#121A2F] px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-violet-400/40 focus:ring-4 focus:ring-violet-500/10"
                   >
-                    <option value="">Choisir un groupe</option>
+                    <option value="">Choisir un réseau</option>
                     {groups.map((group) => (
                       <option key={group} value={group}>
                         {group}
@@ -737,9 +758,9 @@ export default function Campaigns({ session }: CampaignsProps) {
                     name="target_client_id"
                     value={form.target_client_id}
                     onChange={handleChange}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+                    className="w-full rounded-2xl border border-white/10 bg-[#121A2F] px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-violet-400/40 focus:ring-4 focus:ring-violet-500/10"
                   >
-                    <option value="">Choisir un client</option>
+                    <option value="">Choisir un dossier</option>
                     {clients
                       .filter((client) => client.email)
                       .map((client) => (
@@ -755,34 +776,34 @@ export default function Campaigns({ session }: CampaignsProps) {
 
                 <Input
                   name="subject"
-                  placeholder="Sujet de l’email"
+                  placeholder="Sujet de l’approche"
                   value={form.subject}
                   onChange={handleChange}
                 />
 
-                <div className="rounded-2xl border border-dashed border-violet-200 bg-violet-50 px-4 py-3 text-xs font-bold text-slate-500">
+                <div className="rounded-2xl border border-dashed border-violet-400/20 bg-violet-500/10 px-4 py-3 text-xs font-bold text-slate-300">
                   Variables disponibles :
-                  <span className="ml-2 rounded-full border border-violet-100 bg-white px-2 py-1">
+                  <span className="ml-2 inline-flex rounded-full border border-white/10 bg-white/5 px-2 py-1 text-violet-100">
                     {"{{first_name}}"}
                   </span>
-                  <span className="ml-2 rounded-full border border-violet-100 bg-white px-2 py-1">
+                  <span className="ml-2 inline-flex rounded-full border border-white/10 bg-white/5 px-2 py-1 text-violet-100">
                     {"{{group_name}}"}
                   </span>
                 </div>
 
                 <textarea
                   name="content"
-                  placeholder="Exemple : Bonjour {{first_name}}, je te contacte concernant une opportunité liée à {{group_name}}..."
+                  placeholder="Exemple : Bonjour {{first_name}}, je reviens vers vous concernant une opportunité liée à {{group_name}}..."
                   value={form.content}
                   onChange={handleChange}
-                  className="min-h-[240px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300 transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+                  className="min-h-[240px] w-full rounded-2xl border border-white/10 bg-[#121A2F] px-4 py-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500 transition focus:border-violet-400/40 focus:ring-4 focus:ring-violet-500/10"
                 />
 
-                <div className="flex justify-end gap-3 pt-2">
+                <div className="flex flex-col-reverse justify-end gap-3 pt-2 sm:flex-row">
                   <button
                     type="button"
                     onClick={resetModal}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 transition hover:text-slate-950"
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-slate-200 transition hover:bg-white/10 hover:text-white"
                   >
                     Annuler
                   </button>
@@ -790,7 +811,7 @@ export default function Campaigns({ session }: CampaignsProps) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300 transition hover:-translate-y-0.5 hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 shadow-xl shadow-violet-950/30 transition hover:-translate-y-0.5 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {loading ? (
                       <>
@@ -800,7 +821,7 @@ export default function Campaigns({ session }: CampaignsProps) {
                     ) : (
                       <>
                         <MailPlus size={16} />
-                        Enregistrer
+                        Enregistrer l’opération
                       </>
                     )}
                   </button>
@@ -808,54 +829,54 @@ export default function Campaigns({ session }: CampaignsProps) {
               </form>
 
               <div className="space-y-4">
-                <div className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
+                <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-sm">
                   <div className="flex items-center gap-2">
-                    <Sparkles size={16} className="text-violet-700" />
-                    <p className="text-sm font-black text-slate-950">
-                      Aperçu dynamique
+                    <Sparkles size={16} className="text-violet-300" />
+                    <p className="text-sm font-black text-white">
+                      Aperçu PX Sentinel
                     </p>
                   </div>
 
-                  <div className="mt-4 rounded-3xl border border-slate-100 bg-slate-50 p-5">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                  <div className="mt-4 rounded-3xl border border-white/10 bg-[#121A2F]/80 p-5">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
                       Sujet
                     </p>
 
-                    <p className="mt-2 text-base font-black text-slate-950">
+                    <p className="mt-2 text-base font-black text-white">
                       {form.subject || "Ton sujet apparaîtra ici"}
                     </p>
 
-                    <p className="mt-5 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                    <p className="mt-5 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
                       Message
                     </p>
 
-                    <div className="mt-2 whitespace-pre-wrap text-sm font-medium leading-7 text-slate-600">
+                    <div className="mt-2 whitespace-pre-wrap text-sm font-medium leading-7 text-slate-300">
                       {previewText ||
                         "Ton message personnalisé apparaîtra ici."}
                     </div>
                   </div>
                 </div>
 
-                <div className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
-                  <p className="text-sm font-black text-slate-950">
-                    Ciblage estimé
+                <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-sm">
+                  <p className="text-sm font-black text-white">
+                    Ciblage détecté
                   </p>
 
-                  <p className="mt-2 text-3xl font-black text-slate-950">
+                  <p className="mt-2 text-3xl font-black text-white">
                     {targetedClients.length}
                   </p>
 
-                  <p className="mt-2 text-sm font-medium text-slate-500">
+                  <p className="mt-2 text-sm font-medium text-slate-400">
                     {form.target_type === "client"
-                      ? "client sélectionné pour cet envoi"
-                      : "client(s) trouvés dans le groupe sélectionné"}
+                      ? "dossier sélectionné pour cette approche"
+                      : "dossier(s) trouvés dans le réseau sélectionné"}
                   </p>
 
                   <div className="mt-4 space-y-2">
                     {targetedClients.slice(0, 5).map((client) => (
                       <div
                         key={client.id}
-                        className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600"
+                        className="rounded-2xl border border-white/10 bg-[#121A2F]/80 px-4 py-3 text-sm font-bold text-slate-300"
                       >
                         {[client.first_name, client.last_name]
                           .filter(Boolean)
@@ -865,12 +886,22 @@ export default function Campaigns({ session }: CampaignsProps) {
                     ))}
 
                     {targetedClients.length === 0 && (
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-400">
+                      <div className="rounded-2xl border border-white/10 bg-[#121A2F]/80 px-4 py-3 text-sm font-bold text-slate-500">
                         {form.target_type === "client"
-                          ? "Aucun client sélectionné."
-                          : "Aucun client trouvé pour ce groupe."}
+                          ? "Aucun dossier sélectionné."
+                          : "Aucun dossier trouvé pour ce réseau."}
                       </div>
                     )}
+                  </div>
+
+                  <div className="mt-4 rounded-2xl border border-violet-400/20 bg-violet-500/10 p-4">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-200">
+                      Analyse PX Sentinel
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">
+                      Cette opération sera suivie via ouvertures et clics pour
+                      enrichir l’historique des transmissions.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -892,18 +923,18 @@ function StatCard({
   tone?: "slate" | "emerald" | "violet" | "cyan";
 }) {
   const toneClass = {
-    slate: "bg-slate-950 text-white shadow-slate-300",
-    emerald: "bg-emerald-100 text-emerald-700 shadow-emerald-100",
-    violet: "bg-violet-100 text-violet-700 shadow-violet-100",
-    cyan: "bg-cyan-100 text-cyan-700 shadow-cyan-100",
+    slate: "bg-white text-slate-950 shadow-white/10",
+    emerald: "bg-emerald-500/10 text-emerald-200 shadow-emerald-950/20 border border-emerald-400/20",
+    violet: "bg-violet-500/10 text-violet-200 shadow-violet-950/20 border border-violet-400/20",
+    cyan: "bg-cyan-500/10 text-cyan-200 shadow-cyan-950/20 border border-cyan-400/20",
   };
 
   return (
-    <div className="rounded-[2rem] border border-white/75 bg-white/70 p-5 shadow-xl shadow-violet-100/50 backdrop-blur-2xl">
+    <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 shadow-xl shadow-violet-950/20 backdrop-blur-2xl">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-bold text-slate-500">{label}</p>
-          <p className="mt-3 text-3xl font-black text-slate-950">{value}</p>
+          <p className="text-sm font-bold text-slate-400">{label}</p>
+          <p className="mt-3 text-3xl font-black text-white">{value}</p>
         </div>
 
         <div className={`rounded-2xl p-3 shadow-lg ${toneClass[tone]}`}>
@@ -938,17 +969,17 @@ function CampaignMobileCard({
   onDelete: () => void;
 }) {
   return (
-    <div className="rounded-[1.7rem] border border-slate-100 bg-white p-4 shadow-sm">
+    <div className="rounded-[1.7rem] border border-white/10 bg-[#121A2F]/80 p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-lg font-black text-slate-950">{campaign.name}</p>
-          <p className="mt-1 text-sm font-medium text-slate-500">
+          <p className="text-lg font-black text-white">{campaign.name}</p>
+          <p className="mt-1 text-sm font-medium text-slate-400">
             {campaign.subject || "Sans sujet"}
           </p>
         </div>
 
         <Badge
-          value={campaign.status || "draft"}
+          value={statusLabel[campaign.status || "draft"]}
           className={badgeMap[campaign.status || "draft"] || badgeMap.draft}
         />
       </div>
@@ -959,17 +990,19 @@ function CampaignMobileCard({
         <SmallMetric label="Clic" value={`${campaign.click_rate ?? 0}%`} />
       </div>
 
-      <div className="mt-4 rounded-2xl bg-slate-50 p-3">
-        <p className="flex items-center gap-2 text-xs font-bold text-slate-500">
+      <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+        <p className="flex items-center gap-2 text-xs font-bold text-slate-400">
           <Users size={14} />
-          Groupe cible : {campaign.target_group || "—"}
+          {campaign.target_type === "client"
+            ? "Cible : dossier précis"
+            : `Réseau cible : ${campaign.target_group || "—"}`}
         </p>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
         <button
           onClick={onEdit}
-          className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600"
+          className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black text-slate-200"
         >
           <Pencil size={14} />
           Modifier
@@ -979,20 +1012,20 @@ function CampaignMobileCard({
           <button
             onClick={onSend}
             disabled={sending}
-            className="inline-flex items-center gap-1 rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white disabled:opacity-60"
+            className="inline-flex items-center gap-1 rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white disabled:opacity-60"
           >
             {sending ? (
               <Loader2 size={14} className="animate-spin" />
             ) : (
               <Play size={14} />
             )}
-            {sending ? "Envoi..." : "Envoyer"}
+            {sending ? "Déploiement..." : "Déployer"}
           </button>
         )}
 
         <button
           onClick={onDelete}
-          className="inline-flex items-center gap-1 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700"
+          className="inline-flex items-center gap-1 rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-xs font-black text-rose-200"
         >
           <Trash2 size={14} />
           Supprimer
@@ -1010,9 +1043,9 @@ function SmallMetric({
   value: string | number;
 }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-3 text-center">
-      <p className="text-xs font-bold text-slate-400">{label}</p>
-      <p className="mt-1 text-sm font-black text-slate-950">{value}</p>
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-center">
+      <p className="text-xs font-bold text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-black text-white">{value}</p>
     </div>
   );
 }
@@ -1041,7 +1074,7 @@ function Input({
       value={value}
       onChange={onChange}
       required={required}
-      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300 transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+      className="w-full rounded-2xl border border-white/10 bg-[#121A2F] px-4 py-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500 transition focus:border-violet-400/40 focus:ring-4 focus:ring-violet-500/10"
     />
   );
 }

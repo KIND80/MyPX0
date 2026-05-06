@@ -123,6 +123,17 @@ const calculateScore = (client: Client) => {
   return Math.max(score, 0);
 };
 
+const getSignalLabel = (client: Client) => {
+  const score = Number(client.score || 0);
+
+  if (client.status === "chaud" || score >= 100) return "Signal chaud";
+  if (client.status === "a_relancer") return "Action requise";
+  if (client.status === "client") return "Relation active";
+  if (score >= 50) return "Potentiel latent";
+
+  return "À observer";
+};
+
 const sendEmail = async ({
   to,
   subject,
@@ -189,9 +200,7 @@ const enrichClientWithAI = async ({
 };
 
 const csvEscape = (value: string | number | null | undefined) => {
-  const cleanValue = String(value ?? "")
-    .split('"')
-    .join('""');
+  const cleanValue = String(value ?? "").split('"').join('""');
   return `"${cleanValue}"`;
 };
 
@@ -208,6 +217,7 @@ export default function Clients({ session }: ClientsProps) {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
   const { settings } = useUserSettings(session);
+
   const openClient = (clientId: string) => {
     setSelectedClientId(clientId);
 
@@ -225,6 +235,7 @@ export default function Clients({ session }: ClientsProps) {
     url.searchParams.delete("client_id");
     window.history.replaceState({}, "", url.toString());
   };
+
   const fetchClients = async () => {
     setLoadingClients(true);
 
@@ -251,6 +262,7 @@ export default function Clients({ session }: ClientsProps) {
   useEffect(() => {
     fetchClients();
   }, [session.user.id]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const clientIdFromUrl = params.get("client_id");
@@ -259,6 +271,7 @@ export default function Clients({ session }: ClientsProps) {
       setSelectedClientId(clientIdFromUrl);
     }
   }, []);
+
   const groups = useMemo(() => {
     return Array.from(
       new Set(clients.map((client) => client.group_name).filter(Boolean))
@@ -307,7 +320,11 @@ export default function Clients({ session }: ClientsProps) {
   });
 
   const hotCount = clients.filter(
-    (client) => Number(client.score || 0) >= 100
+    (client) => Number(client.score || 0) >= 100 || client.status === "chaud"
+  ).length;
+
+  const actionRequiredCount = clients.filter(
+    (client) => client.status === "a_relancer"
   ).length;
 
   const aiProcessingCount = clients.filter(
@@ -337,7 +354,7 @@ export default function Clients({ session }: ClientsProps) {
     e.stopPropagation();
 
     const confirmDelete = window.confirm(
-      "Supprimer ce client ? Cette action est définitive."
+      "Supprimer ce dossier relationnel ? Cette action est définitive."
     );
 
     if (!confirmDelete) return;
@@ -364,13 +381,14 @@ export default function Clients({ session }: ClientsProps) {
       "Téléphone",
       "Société",
       "Ville",
-      "Groupe",
+      "Réseau",
       "Statut",
       "Score",
+      "Indice IA",
       "Potentiel",
       "Dernier contact",
       "Créé le",
-      "Notes",
+      "Renseignements",
     ];
 
     const rows = filteredClients.map((client) => [
@@ -383,6 +401,7 @@ export default function Clients({ session }: ClientsProps) {
       client.group_name,
       client.status,
       client.score,
+      client.ai_score,
       client.potential_amount,
       client.last_contact_at,
       client.created_at,
@@ -400,7 +419,9 @@ export default function Clients({ session }: ClientsProps) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `clients-mypx-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `dossiers-mypx-${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -578,76 +599,99 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-violet-700">
-            <Users size={14} />
-            Portefeuille client
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-950 p-5 text-white shadow-2xl shadow-violet-950/30 sm:p-6">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.40),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.25),transparent_35%)]" />
+        <div className="absolute right-5 top-5 h-32 w-32 rounded-full border border-violet-400/20 bg-violet-500/10 blur-sm" />
+
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-violet-100">
+              <Users size={14} />
+              Terrain relationnel
+            </div>
+
+            <h2 className="mt-4 text-4xl font-black tracking-tight text-white">
+              Dossiers
+            </h2>
+
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-300">
+              Centralise tes relations, détecte les signaux utiles et transforme
+              ton portefeuille en système d’intelligence relationnelle.
+            </p>
           </div>
 
-          <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950">
-            Clients
-          </h2>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={handleExportCsv}
+              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-white/15"
+            >
+              <Download size={16} />
+              Exporter les dossiers
+            </button>
 
-          <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
-            Ajoute, filtre, exporte et structure ton portefeuille dans une
-            interface simple, rapide et augmentée par l’IA.
-          </p>
+            <button
+              onClick={() => setShowModal(true)}
+              className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 shadow-xl transition hover:-translate-y-0.5"
+            >
+              <Plus size={16} />
+              Nouveau dossier
+            </button>
+          </div>
         </div>
-
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={handleExportCsv}
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:text-slate-950"
-          >
-            <Download size={16} />
-            Export CSV
-          </button>
-
-          <button
-            onClick={() => setShowModal(true)}
-            className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300 transition hover:-translate-y-0.5 hover:bg-black"
-          >
-            <Plus size={16} />
-            Nouveau client
-          </button>
-        </div>
-      </div>
+      </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <MiniStat
           icon={<Users size={18} />}
-          label="Contacts"
+          label="Dossiers actifs"
           value={clients.length}
           tone="slate"
         />
         <MiniStat
           icon={<Flame size={18} />}
-          label="Clients chauds"
+          label="Signaux chauds"
           value={hotCount}
           tone="orange"
         />
         <MiniStat
-          icon={<Bot size={18} />}
-          label="Analyses IA"
-          value={aiProcessingCount}
+          icon={<Sparkles size={18} />}
+          label="Actions requises"
+          value={actionRequiredCount}
           tone="violet"
         />
         <MiniStat
           icon={<Euro size={18} />}
-          label="Pipeline"
+          label="Potentiel terrain"
           value={`${pipelineAmount.toLocaleString("fr-FR")}€`}
           tone="cyan"
         />
       </section>
 
-      <div className="rounded-[2rem] border border-white/75 bg-white/70 p-4 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl">
+      <div className="rounded-[2rem] border border-white/75 bg-white/80 p-4 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-black text-slate-950">
+              Console de recherche
+            </p>
+            <p className="text-xs font-medium text-slate-500">
+              Filtre par relation, société, réseau, statut, score ou signal IA.
+            </p>
+          </div>
+
+          {aiProcessingCount > 0 && (
+            <div className="inline-flex w-fit items-center gap-2 rounded-full bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-700">
+              <Loader2 size={13} className="animate-spin" />
+              {aiProcessingCount} analyse Sentinel en cours
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_220px_220px_220px]">
           <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-violet-300 focus-within:ring-4 focus-within:ring-violet-100">
             <Search size={16} className="text-slate-400" />
             <input
               type="text"
-              placeholder="Rechercher un client, une société, un email, un groupe..."
+              placeholder="Rechercher un dossier, une société, un email, un signal..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-transparent text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300"
@@ -655,7 +699,7 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
           </div>
 
           <FilterSelect value={groupFilter} onChange={setGroupFilter}>
-            <option value="all">Tous les groupes</option>
+            <option value="all">Tous les réseaux</option>
             {groups.map((group) => (
               <option key={group} value={group}>
                 {group}
@@ -673,19 +717,19 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
           </FilterSelect>
 
           <FilterSelect value={scoreFilter} onChange={setScoreFilter}>
-            <option value="all">Tous les scores</option>
-            <option value="hot">🔥 Chauds 100+</option>
-            <option value="warm">Tièdes 50-99</option>
-            <option value="cold">Froids -50</option>
+            <option value="all">Tous les signaux</option>
+            <option value="hot">🔥 Signaux chauds 100+</option>
+            <option value="warm">Potentiel latent 50-99</option>
+            <option value="cold">À observer -50</option>
           </FilterSelect>
         </div>
       </div>
 
-      <div className="rounded-[2rem] border border-white/75 bg-white/70 p-4 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl">
+      <div className="rounded-[2rem] border border-white/75 bg-white/80 p-4 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl">
         {loadingClients ? (
           <div className="flex items-center justify-center gap-3 py-12 text-sm font-bold text-slate-500">
             <Loader2 size={18} className="animate-spin" />
-            Chargement des clients...
+            PX Sentinel charge les dossiers...
           </div>
         ) : filteredClients.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
@@ -693,17 +737,17 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
               <UserPlus size={26} />
             </div>
             <h3 className="text-lg font-black text-slate-950">
-              Aucun client trouvé
+              Aucun dossier détecté
             </h3>
             <p className="max-w-md text-sm leading-6 text-slate-500">
-              Modifie tes filtres ou ajoute un nouveau client pour lancer
-              l’intelligence MyPX.
+              Modifie tes filtres ou crée un nouveau dossier pour activer
+              l’intelligence relationnelle MyPX.
             </p>
             <button
               onClick={() => setShowModal(true)}
               className="mt-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300"
             >
-              Ajouter un client
+              Créer un dossier
             </button>
           </div>
         ) : (
@@ -723,14 +767,14 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
               <table className="min-w-full text-left text-sm text-slate-600">
                 <thead className="text-xs uppercase tracking-[0.18em] text-slate-400">
                   <tr>
-                    <th className="px-4 py-4">Nom</th>
+                    <th className="px-4 py-4">Dossier</th>
                     <th className="px-4 py-4">Email</th>
                     <th className="px-4 py-4">Téléphone</th>
                     <th className="px-4 py-4">Société</th>
                     <th className="px-4 py-4">Ville</th>
-                    <th className="px-4 py-4">Groupe</th>
-                    <th className="px-4 py-4">Statut</th>
-                    <th className="px-4 py-4">Score</th>
+                    <th className="px-4 py-4">Réseau</th>
+                    <th className="px-4 py-4">Signal</th>
+                    <th className="px-4 py-4">Scores</th>
                     <th className="px-4 py-4">Potentiel</th>
                     <th className="px-4 py-4">Actions</th>
                   </tr>
@@ -746,7 +790,7 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
                       <td className="px-4 py-4 font-black text-slate-950">
                         {[client.first_name, client.last_name]
                           .filter(Boolean)
-                          .join(" ") || "—"}
+                          .join(" ") || "Dossier sans nom"}
                       </td>
                       <td className="px-4 py-4">{client.email || "—"}</td>
                       <td className="px-4 py-4">{client.phone || "—"}</td>
@@ -754,14 +798,16 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
                       <td className="px-4 py-4">{client.city || "—"}</td>
                       <td className="px-4 py-4">{client.group_name || "—"}</td>
                       <td className="px-4 py-4">
-                        <StatusBadge value={client.status || "prospect"} />
+                        <StatusBadge value={getSignalLabel(client)} />
                       </td>
                       <td className="px-4 py-4">
                         <ScoreStack client={client} />
                       </td>
                       <td className="px-4 py-4 font-bold text-slate-800">
                         {client.potential_amount
-                          ? `${client.potential_amount} €`
+                          ? `${client.potential_amount.toLocaleString(
+                              "fr-FR"
+                            )} €`
                           : "0 €"}
                       </td>
                       <td className="px-4 py-4">
@@ -783,22 +829,22 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-white/75 bg-white/90 p-5 shadow-2xl shadow-violet-300/40 backdrop-blur-2xl sm:p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-white/75 bg-white/95 p-5 shadow-2xl shadow-violet-300/40 backdrop-blur-2xl sm:p-6">
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-violet-700">
                   <Sparkles size={14} />
-                  Nouveau client
+                  Nouveau dossier
                 </div>
 
                 <h3 className="mt-3 text-2xl font-black text-slate-950">
-                  Ajouter un contact
+                  Créer un dossier relationnel
                 </h3>
 
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                  MyPX prépare automatiquement la fiche, l’email de bienvenue et
-                  l’enrichissement IA dès l’enregistrement.
+                  MyPX prépare automatiquement le dossier, la séquence d’accueil
+                  et l’analyse PX Sentinel dès l’enregistrement.
                 </p>
               </div>
 
@@ -815,11 +861,11 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
                 <Wand2 className="mt-0.5 h-5 w-5 text-cyan-700" />
                 <div>
                   <p className="text-sm font-black text-slate-950">
-                    Automatisation active
+                    PX Sentinel activé
                   </p>
                   <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Après ajout : analyse IA, score CRM, email de bienvenue et
-                    log d’envoi si l’email est renseigné.
+                    Après création : analyse IA, score relationnel, email de
+                    bienvenue et historique d’envoi si l’email est renseigné.
                   </p>
                 </div>
               </div>
@@ -876,14 +922,14 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
                 icon={<CalendarDays size={15} />}
                 name="birthday"
                 type="date"
-                placeholder="Date anniversaire"
+                placeholder="Moment relationnel"
                 value={form.birthday}
                 onChange={handleChange}
               />
               <FormInput
                 icon={<Users size={15} />}
                 name="group_name"
-                placeholder="Groupe : Assurance, Invest, Premium..."
+                placeholder="Réseau : Assurance, Invest, Premium..."
                 value={form.group_name}
                 onChange={handleChange}
               />
@@ -895,23 +941,23 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
                 className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
               >
                 <option value="prospect">Prospect</option>
-                <option value="client">Client</option>
-                <option value="chaud">Chaud</option>
-                <option value="a_relancer">À relancer</option>
+                <option value="client">Relation active</option>
+                <option value="chaud">Signal chaud</option>
+                <option value="a_relancer">Action requise</option>
               </select>
 
               <FormInput
                 icon={<Euro size={15} />}
                 name="potential_amount"
                 type="number"
-                placeholder="Potentiel (€)"
+                placeholder="Potentiel commercial (€)"
                 value={form.potential_amount}
                 onChange={handleChange}
               />
 
               <textarea
                 name="notes"
-                placeholder="Notes, contexte, besoin, origine du contact..."
+                placeholder="Renseignements, contexte, besoin, origine du contact, signaux faibles..."
                 value={form.notes}
                 onChange={handleChange}
                 className="min-h-[120px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300 transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100 md:col-span-2"
@@ -934,12 +980,12 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
                   {loading ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      Enregistrement...
+                      Création du dossier...
                     </>
                   ) : (
                     <>
                       <Plus size={16} />
-                      Enregistrer le client
+                      Créer le dossier
                     </>
                   )}
                 </button>
@@ -971,7 +1017,7 @@ function MiniStat({
   };
 
   return (
-    <div className="rounded-[2rem] border border-white/75 bg-white/70 p-5 shadow-xl shadow-violet-100/50 backdrop-blur-2xl">
+    <div className="rounded-[2rem] border border-white/75 bg-white/80 p-5 shadow-xl shadow-violet-100/50 backdrop-blur-2xl">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-bold text-slate-500">{label}</p>
@@ -1007,8 +1053,20 @@ function FilterSelect({
 }
 
 function StatusBadge({ value }: { value: string }) {
+  const isHot = value.toLowerCase().includes("chaud");
+  const isAction = value.toLowerCase().includes("action");
+  const isActive = value.toLowerCase().includes("active");
+
+  const classes = isHot
+    ? "border-orange-100 bg-orange-50 text-orange-700"
+    : isAction
+    ? "border-violet-100 bg-violet-50 text-violet-700"
+    : isActive
+    ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+    : "border-slate-100 bg-slate-50 text-slate-600";
+
   return (
-    <span className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600">
+    <span className={`rounded-full border px-3 py-1 text-xs font-black ${classes}`}>
       {value}
     </span>
   );
@@ -1022,18 +1080,20 @@ function ScoreStack({ client }: { client: Client }) {
       </span>
 
       <span className="w-fit rounded-full bg-cyan-50 px-3 py-1 text-xs font-black text-cyan-700">
-        IA {client.ai_score ?? 0}
+        Sentinel {client.ai_score ?? 0}
       </span>
 
       {client.public_enrichment_status === "processing" && (
         <span className="inline-flex items-center gap-1 text-xs font-black text-amber-600">
           <Loader2 size={12} className="animate-spin" />
-          Analyse IA...
+          Analyse Sentinel...
         </span>
       )}
 
       {client.public_enrichment_status === "failed" && (
-        <span className="text-xs font-black text-rose-600">IA échouée</span>
+        <span className="text-xs font-black text-rose-600">
+          Sentinel échoué
+        </span>
       )}
 
       {client.ai_status && (
@@ -1063,14 +1123,14 @@ function ClientMobileCard({
         <div>
           <p className="text-lg font-black text-slate-950">
             {[client.first_name, client.last_name].filter(Boolean).join(" ") ||
-              "Client"}
+              "Dossier sans nom"}
           </p>
           <p className="mt-1 text-sm font-medium text-slate-500">
             {client.company || client.email || "Sans société"}
           </p>
         </div>
 
-        <StatusBadge value={client.status || "prospect"} />
+        <StatusBadge value={getSignalLabel(client)} />
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold text-slate-500">
@@ -1088,7 +1148,7 @@ function ClientMobileCard({
         <div className="mt-3 rounded-2xl bg-violet-50 p-3">
           <p className="mb-1 flex items-center gap-2 text-xs font-black text-violet-700">
             <Bot size={13} />
-            Action IA
+            Action Sentinel
           </p>
           <p className="text-xs leading-5 text-slate-600">
             {client.next_best_action}
@@ -1098,7 +1158,9 @@ function ClientMobileCard({
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className="text-sm font-black text-slate-950">
-          {client.potential_amount ? `${client.potential_amount} €` : "0 €"}
+          {client.potential_amount
+            ? `${client.potential_amount.toLocaleString("fr-FR")} €`
+            : "0 €"}
         </p>
 
         <button

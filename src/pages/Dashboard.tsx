@@ -22,6 +22,7 @@ import {
   Mail,
   Megaphone,
   Plus,
+  Radar,
   Settings as SettingsIcon,
   Sparkles,
   Star,
@@ -72,24 +73,24 @@ type CampaignRow = {
 
 const onboardingSteps = [
   {
-    title: "Connecte ton email MyPX",
+    title: "Active ton identité relationnelle",
     description:
-      "Ton adresse conseiller reçoit les réponses clients directement dans MyPX.",
+      "Configure ton profil conseiller, ta signature et ton adresse email MyPX.",
   },
   {
-    title: "Ajoute tes clients",
+    title: "Importe tes dossiers clients",
     description:
-      "Centralise ton portefeuille avec statut, potentiel, groupe et relances.",
+      "Centralise ton portefeuille avec statut, potentiel, groupe et historique.",
   },
   {
-    title: "Personnalise ton Welcome",
+    title: "Prépare ta séquence d’accueil",
     description:
-      "Prépare un message d’accueil automatique propre et professionnel.",
+      "Chaque nouveau client reçoit un message professionnel avec ta signature.",
   },
   {
-    title: "Anime ton portefeuille",
+    title: "Laisse PX Sentinel surveiller les signaux",
     description:
-      "Relances, anniversaires, campagnes et Radar IA t’aident à rester présent.",
+      "Relances, anniversaires, réponses et opportunités sont transformés en actions.",
   },
 ];
 
@@ -98,11 +99,11 @@ const navItems: {
   label: string;
   icon: React.ElementType;
 }[] = [
-  { view: "home", label: "Dashboard", icon: LayoutDashboard },
-  { view: "email_hub", label: "Email", icon: InboxIcon },
-  { view: "radar_ai", label: "Radar IA", icon: Bot },
-  { view: "clients", label: "Clients", icon: Users },
-  { view: "settings", label: "Paramètres", icon: SettingsIcon },
+  { view: "home", label: "Commandement", icon: LayoutDashboard },
+  { view: "email_hub", label: "Transmissions", icon: InboxIcon },
+  { view: "radar_ai", label: "PX Sentinel", icon: Radar },
+  { view: "clients", label: "Dossiers", icon: Users },
+  { view: "settings", label: "Réglages", icon: SettingsIcon },
 ];
 
 function getInitialView(): ActiveView {
@@ -377,31 +378,37 @@ export default function Dashboard({ session }: DashboardProps) {
     }, 0);
   }, [clients]);
 
+  const activeSignals =
+    todayFollowUps.length +
+    unreadEmails +
+    birthdaysToday.length +
+    inactiveClients90.length;
+
   const stats = [
     {
-      label: "Clients",
+      label: "Dossiers actifs",
       value: loadingStats ? "..." : String(clients.length),
-      sub: "Portefeuille total",
+      sub: "Portefeuille sous surveillance",
       icon: Users,
     },
     {
-      label: "Emails non lus",
+      label: "Transmissions",
       value: loadingStats ? "..." : String(unreadEmails),
-      sub: "Réponses clients reçues",
+      sub: "Réponses clients non lues",
       icon: InboxIcon,
     },
     {
-      label: "Relances dues",
+      label: "Actions dues",
       value: loadingStats ? "..." : String(dueFollowUps.length),
       sub: "À traiter maintenant",
       icon: Clock3,
     },
     {
-      label: "Pipeline",
+      label: "Potentiel détecté",
       value: loadingStats
         ? "..."
         : `${pipelineAmount.toLocaleString("fr-FR")}€`,
-      sub: "Potentiel estimé",
+      sub: "Pipeline estimé",
       icon: WalletCards,
     },
   ];
@@ -434,44 +441,79 @@ export default function Dashboard({ session }: DashboardProps) {
       unreadEmails={unreadEmails}
     >
       <div className="mx-auto w-full max-w-7xl">
-        <header className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/75 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-violet-700 shadow-sm backdrop-blur-xl">
-              <Bot size={14} />
-              Portfolio Intelligence
+        <header className="mb-6 grid gap-5 xl:grid-cols-[1.4fr_0.8fr]">
+          <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950 p-5 text-white shadow-2xl shadow-violet-200/40 sm:p-7">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.42),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.28),transparent_34%)]" />
+            <div className="pointer-events-none absolute right-8 top-8 h-32 w-32 rounded-full border border-cyan-300/20" />
+            <div className="pointer-events-none absolute right-12 top-12 h-24 w-24 animate-pulse rounded-full border border-violet-300/20" />
+
+            <div className="relative">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-cyan-100 backdrop-blur-xl">
+                <Radar size={14} />
+                Centre de commandement MyPX
+              </div>
+
+              <h1 className="mt-5 text-3xl font-black leading-tight tracking-tight sm:text-5xl xl:text-6xl">
+                Bonjour, {userName}
+              </h1>
+
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-white/65 md:text-base">
+                PX Sentinel observe ton portefeuille, priorise les signaux et
+                transforme chaque interaction en action relationnelle.
+              </p>
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <button
+                  onClick={() => setActiveView("radar_ai")}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-4 text-sm font-black text-slate-950 shadow-xl shadow-cyan-950/20 transition hover:-translate-y-0.5"
+                >
+                  <Radar size={17} />
+                  Ouvrir PX Sentinel
+                </button>
+
+                <button
+                  onClick={() => setActiveView("clients")}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-sm font-black text-white backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/15"
+                >
+                  <Plus size={17} />
+                  Accéder aux dossiers
+                </button>
+              </div>
             </div>
-
-            <h1 className="mt-4 text-3xl font-black leading-tight tracking-tight text-slate-950 sm:text-5xl xl:text-6xl">
-              Bonjour, {userName}
-            </h1>
-
-            <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
-              Ton cockpit MyPX centralise tes clients, réponses email, relances,
-              campagnes et opportunités IA.
-            </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
-            <button
-              onClick={() => setActiveView("email_hub")}
-              className="relative inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-4 text-sm font-black text-slate-950 shadow-xl shadow-violet-100 transition hover:-translate-y-0.5"
-            >
-              <InboxIcon size={17} />
-              Email
-              {unreadEmails > 0 && (
-                <span className="rounded-full bg-rose-500 px-2 py-0.5 text-xs text-white">
-                  {unreadEmails}
-                </span>
-              )}
-            </button>
+          <div className="rounded-[2rem] border border-white/80 bg-white/80 p-5 shadow-2xl shadow-violet-100 backdrop-blur-2xl sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-violet-700">
+                  <Bot size={14} />
+                  Brief IA
+                </div>
 
-            <button
-              onClick={() => setActiveView("clients")}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-sm font-black text-white shadow-xl shadow-slate-300 transition hover:-translate-y-0.5 hover:bg-black"
-            >
-              <Plus size={17} />
-              Gérer les clients
-            </button>
+                <h2 className="mt-4 text-2xl font-black tracking-tight text-slate-950">
+                  {activeSignals > 0
+                    ? `${activeSignals} signal(s) à examiner`
+                    : "Terrain calme"}
+                </h2>
+
+                <p className="mt-3 text-sm leading-7 text-slate-600">
+                  {activeSignals > 0
+                    ? "Des opportunités, réponses ou relations sensibles demandent ton attention."
+                    : "Aucun signal critique. Profite-en pour enrichir ton portefeuille."}
+                </p>
+              </div>
+
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-slate-950 text-white shadow-xl shadow-slate-300">
+                <Sparkles size={22} />
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <MiniSignal label="Aujourd’hui" value={todayFollowUps.length} />
+              <MiniSignal label="Emails" value={unreadEmails} />
+              <MiniSignal label="Anniv." value={birthdaysToday.length} />
+              <MiniSignal label="Dormants" value={inactiveClients90.length} />
+            </div>
           </div>
         </header>
 
@@ -481,16 +523,16 @@ export default function Dashboard({ session }: DashboardProps) {
               <div className="max-w-2xl">
                 <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-violet-700">
                   <Sparkles size={14} />
-                  Workflow conseillé
+                  Protocole conseillé
                 </div>
 
                 <h2 className="mt-4 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                  Fais vivre ton portefeuille sans effort.
+                  Transforme ton CRM en système d’intelligence relationnelle.
                 </h2>
 
                 <p className="mt-3 text-sm leading-7 text-slate-600">
-                  MyPX devient ton assistant relationnel : il garde le lien,
-                  détecte les signaux et t’aide à agir au bon moment.
+                  MyPX ne stocke pas seulement tes contacts : il t’aide à garder
+                  le lien, détecter les bons moments et agir avec précision.
                 </p>
               </div>
 
@@ -510,7 +552,7 @@ export default function Dashboard({ session }: DashboardProps) {
                   className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-violet-100"
                 >
                   <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-500">
-                    Étape {index + 1}
+                    Mission {index + 1}
                   </p>
 
                   <h3 className="mt-3 text-base font-black text-slate-950 sm:text-lg">
@@ -534,12 +576,11 @@ export default function Dashboard({ session }: DashboardProps) {
               <button
                 key={item.label}
                 onClick={() => {
-                  if (item.label === "Emails non lus")
-                    setActiveView("email_hub");
-                  if (item.label === "Clients") setActiveView("clients");
-                  if (item.label === "Relances dues") setActiveView("clients");
+                  if (item.label === "Transmissions") setActiveView("email_hub");
+                  if (item.label === "Dossiers actifs") setActiveView("clients");
+                  if (item.label === "Actions dues") setActiveView("clients");
                 }}
-                className="rounded-[2rem] border border-white/80 bg-white/75 p-5 text-left shadow-xl shadow-violet-100/50 backdrop-blur-2xl transition hover:-translate-y-1"
+                className="group rounded-[2rem] border border-white/80 bg-white/75 p-5 text-left shadow-xl shadow-violet-100/50 backdrop-blur-2xl transition hover:-translate-y-1"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
@@ -556,7 +597,7 @@ export default function Dashboard({ session }: DashboardProps) {
                     </p>
                   </div>
 
-                  <div className="shrink-0 rounded-2xl bg-slate-950 p-3 text-white shadow-lg shadow-slate-300">
+                  <div className="shrink-0 rounded-2xl bg-slate-950 p-3 text-white shadow-lg shadow-slate-300 transition group-hover:scale-105">
                     <Icon size={18} />
                   </div>
                 </div>
@@ -567,37 +608,37 @@ export default function Dashboard({ session }: DashboardProps) {
 
         <section className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
           <PriorityCard
-            title="Aujourd’hui"
+            title="Signal chaud"
             value={loadingStats ? "..." : String(todayFollowUps.length)}
-            subtitle="Relances à traiter"
+            subtitle="Actions à traiter aujourd’hui"
             tone="orange"
             emoji="🔥"
           />
 
           <PriorityCard
-            title="Réponses client"
+            title="Transmission reçue"
             value={loadingStats ? "..." : String(unreadEmails)}
-            subtitle="Emails non lus"
+            subtitle="Réponses client à ouvrir"
             tone="amber"
             emoji="📩"
           />
 
           <PriorityCard
-            title="Dormants"
+            title="Relation froide"
             value={loadingStats ? "..." : String(inactiveClients90.length)}
             subtitle="90+ jours sans contact"
             tone="cyan"
-            emoji="💡"
+            emoji="🧊"
           />
         </section>
 
         <section className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-3">
           <DashboardCard
             icon={<Flame size={18} className="text-orange-500" />}
-            title="Top clients chauds"
+            title="Dossiers à fort potentiel"
           >
             {hotClients.length === 0 ? (
-              <EmptyState text="Aucun client scoré pour le moment." />
+              <EmptyState text="Aucun dossier scoré pour le moment." />
             ) : (
               hotClients.map((client, index) => (
                 <div
@@ -614,13 +655,13 @@ export default function Dashboard({ session }: DashboardProps) {
                       </p>
 
                       <p className="mt-1 truncate text-xs font-medium text-orange-700">
-                        {client.group_name || "Sans groupe"} •{" "}
+                        {client.group_name || "Sans réseau"} •{" "}
                         {client.status || "prospect"}
                       </p>
                     </div>
 
                     <span className="shrink-0 rounded-full bg-orange-200 px-3 py-1 text-xs font-black text-orange-900">
-                      {client.score ?? 0}
+                      Score {client.score ?? 0}
                     </span>
                   </div>
 
@@ -628,7 +669,7 @@ export default function Dashboard({ session }: DashboardProps) {
                     onClick={() => openClientFromDashboard(client.id)}
                     className="mt-3 text-xs font-black text-orange-700 hover:underline"
                   >
-                    Ouvrir fiche →
+                    Ouvrir le dossier →
                   </button>
                 </div>
               ))
@@ -637,7 +678,7 @@ export default function Dashboard({ session }: DashboardProps) {
 
           <DashboardCard
             icon={<CircleAlert size={18} className="text-violet-600" />}
-            title="Rappels intelligents"
+            title="Alertes PX Sentinel"
           >
             {todayFollowUps.length === 0 &&
             dueFollowUps.length === 0 &&
@@ -645,7 +686,7 @@ export default function Dashboard({ session }: DashboardProps) {
             birthdaysToday.length === 0 &&
             upcomingBirthdays.length === 0 &&
             inactiveClients90.length === 0 ? (
-              <EmptyState text="Aucun rappel critique pour le moment." />
+              <EmptyState text="Aucun signal critique pour le moment." />
             ) : (
               <>
                 {birthdaysToday.map((client) => (
@@ -654,7 +695,7 @@ export default function Dashboard({ session }: DashboardProps) {
                     tone="pink"
                     onAction={() => openClientFromDashboard(client.id)}
                   >
-                    🎂 Anniversaire aujourd’hui :{" "}
+                    🎂 Moment relationnel : anniversaire aujourd’hui —{" "}
                     {[client.first_name, client.last_name]
                       .filter(Boolean)
                       .join(" ") || "Client"}
@@ -683,7 +724,7 @@ export default function Dashboard({ session }: DashboardProps) {
                     tone="slate"
                     onAction={() => setActiveView("clients")}
                   >
-                    Aujourd’hui : {item.title}
+                    Action du jour : {item.title}
                   </ReminderItem>
                 ))}
 
@@ -693,7 +734,7 @@ export default function Dashboard({ session }: DashboardProps) {
                     tone="amber"
                     onAction={() => setActiveView("clients")}
                   >
-                    En retard : {item.title}
+                    Signal en retard : {item.title}
                   </ReminderItem>
                 ))}
 
@@ -703,7 +744,7 @@ export default function Dashboard({ session }: DashboardProps) {
                     tone="rose"
                     onAction={() => setActiveView("clients")}
                   >
-                    Urgent : {item.title}
+                    Priorité haute : {item.title}
                   </ReminderItem>
                 ))}
 
@@ -713,10 +754,11 @@ export default function Dashboard({ session }: DashboardProps) {
                     tone="sky"
                     onAction={() => openClientFromDashboard(client.id)}
                   >
-                    90+ jours sans contact :{" "}
+                    Relation froide :{" "}
                     {[client.first_name, client.last_name]
                       .filter(Boolean)
-                      .join(" ") || "Client"}
+                      .join(" ") || "Client"}{" "}
+                    — 90+ jours sans contact
                   </ReminderItem>
                 ))}
               </>
@@ -725,10 +767,10 @@ export default function Dashboard({ session }: DashboardProps) {
 
           <DashboardCard
             icon={<Star size={18} className="text-cyan-600" />}
-            title="Relances prioritaires"
+            title="Actions prioritaires"
           >
             {dueFollowUps.length === 0 ? (
-              <EmptyState text="Aucune relance à traiter immédiatement." />
+              <EmptyState text="Aucune action prioritaire à traiter immédiatement." />
             ) : (
               dueFollowUps.slice(0, 4).map((item) => (
                 <div
@@ -742,7 +784,7 @@ export default function Dashboard({ session }: DashboardProps) {
                   <p className="mt-1 text-xs font-medium text-slate-500">
                     {item.client_id
                       ? clientMap.get(item.client_id) || "Client"
-                      : "Sans client lié"}
+                      : "Sans dossier lié"}
                   </p>
 
                   <p className="mt-2 text-xs font-bold text-slate-400">
@@ -755,7 +797,7 @@ export default function Dashboard({ session }: DashboardProps) {
                     onClick={() => setActiveView("clients")}
                     className="mt-3 text-xs font-black text-violet-600 hover:underline"
                   >
-                    Traiter la relance →
+                    Traiter l’action →
                   </button>
                 </div>
               ))
@@ -773,52 +815,22 @@ function EmailHub({ session }: { session: Session }) {
   );
 
   const tabs = [
-    { key: "inbox", label: "Boîte mail", icon: InboxIcon },
-    { key: "campaigns", label: "Campagnes", icon: Megaphone },
-    { key: "welcome", label: "Welcome", icon: Mail },
-    { key: "logs", label: "Logs", icon: Clock3 },
+    { key: "inbox", label: "Boîte de réception", icon: InboxIcon },
+    { key: "campaigns", label: "Opérations", icon: Megaphone },
+    { key: "welcome", label: "Séquence d’accueil", icon: Mail },
+    { key: "logs", label: "Historique", icon: Clock3 },
   ] as const;
 
   return (
     <div className="mx-auto w-full max-w-7xl">
-      <div className="mb-5 rounded-[2rem] border border-white/80 bg-white/80 p-4 shadow-2xl shadow-violet-100 backdrop-blur-2xl sm:p-6">
-        <div className="mb-5">
-          <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-violet-700">
-            <InboxIcon size={14} />
-            Centre email MyPX
-          </div>
+      <HubHeader
+        icon={<InboxIcon size={14} />}
+        badge="Centre des transmissions"
+        title="Transmissions, opérations et séquences"
+        description="Toutes tes communications client sont regroupées ici : réponses entrantes, campagnes, welcome et historique."
+      />
 
-          <h1 className="mt-4 text-2xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl">
-            Emails, campagnes, welcome et logs
-          </h1>
-
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-            Tout ce qui concerne la relation email est regroupé ici.
-          </p>
-        </div>
-
-        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {tabs.map((item) => {
-            const Icon = item.icon;
-            const active = tab === item.key;
-
-            return (
-              <button
-                key={item.key}
-                onClick={() => setTab(item.key)}
-                className={`flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition active:scale-[0.98] ${
-                  active
-                    ? "bg-slate-950 text-white shadow-xl shadow-slate-300"
-                    : "bg-white text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-950"
-                }`}
-              >
-                <Icon size={17} />
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <TabBar tabs={tabs} activeTab={tab} setTab={setTab} />
 
       {tab === "inbox" && <Inbox session={session} />}
       {tab === "campaigns" && <Campaigns session={session} />}
@@ -832,50 +844,20 @@ function ClientsHub({ session }: { session: Session }) {
   const [tab, setTab] = useState<"clients" | "follow_ups">("clients");
 
   const tabs = [
-    { key: "clients", label: "Portefeuille clients", icon: Users },
-    { key: "follow_ups", label: "Relances", icon: Bell },
+    { key: "clients", label: "Dossiers clients", icon: Users },
+    { key: "follow_ups", label: "Actions IA", icon: Bell },
   ] as const;
 
   return (
     <div className="mx-auto w-full max-w-7xl">
-      <div className="mb-5 rounded-[2rem] border border-white/80 bg-white/80 p-4 shadow-2xl shadow-violet-100 backdrop-blur-2xl sm:p-6">
-        <div className="mb-5">
-          <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-violet-700">
-            <Users size={14} />
-            Portefeuille client
-          </div>
+      <HubHeader
+        icon={<Users size={14} />}
+        badge="Portefeuille relationnel"
+        title="Dossiers clients et actions prioritaires"
+        description="Gère tes fiches, tes relances, tes signaux et ton suivi commercial depuis un seul espace."
+      />
 
-          <h1 className="mt-4 text-2xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl">
-            Clients et relances
-          </h1>
-
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-            Gère tes fiches clients et ton suivi commercial au même endroit.
-          </p>
-        </div>
-
-        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {tabs.map((item) => {
-            const Icon = item.icon;
-            const active = tab === item.key;
-
-            return (
-              <button
-                key={item.key}
-                onClick={() => setTab(item.key)}
-                className={`flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition active:scale-[0.98] ${
-                  active
-                    ? "bg-slate-950 text-white shadow-xl shadow-slate-300"
-                    : "bg-white text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-950"
-                }`}
-              >
-                <Icon size={17} />
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <TabBar tabs={tabs} activeTab={tab} setTab={setTab} />
 
       {tab === "clients" && <Clients session={session} />}
       {tab === "follow_ups" && <FollowUps session={session} />}
@@ -899,8 +881,8 @@ function AppShell({
   children,
 }: AppShellProps) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#fbf7ef] text-slate-950">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.2),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(6,182,212,0.18),transparent_30%),linear-gradient(135deg,#fff7ed_0%,#f5f3ff_50%,#ecfeff_100%)]" />
+    <div className="relative min-h-screen overflow-hidden bg-[#f8f3ea] text-slate-950">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.20),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(6,182,212,0.18),transparent_30%),linear-gradient(135deg,#fff7ed_0%,#f5f3ff_50%,#ecfeff_100%)]" />
       <div className="pointer-events-none fixed left-[-90px] top-[-90px] h-72 w-72 rounded-full bg-violet-300/30 blur-3xl" />
       <div className="pointer-events-none fixed bottom-[-110px] right-[-110px] h-80 w-80 rounded-full bg-cyan-300/30 blur-3xl" />
 
@@ -925,7 +907,7 @@ function AppShell({
                 onClick={() => setActiveView("home")}
                 className="rounded-2xl border border-slate-200 bg-white/85 px-4 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:text-slate-950"
               >
-                Retour dashboard
+                Retour commandement
               </button>
 
               <button
@@ -959,7 +941,7 @@ type SidebarProps = {
 function Sidebar({ activeView, setActiveView, unreadEmails }: SidebarProps) {
   return (
     <aside className="sticky top-0 hidden h-screen w-80 shrink-0 overflow-y-auto border-r border-white/70 bg-white/55 p-6 shadow-2xl shadow-violet-100 backdrop-blur-2xl lg:block">
-      <div className="rounded-[2rem] bg-slate-950 p-5 text-white shadow-2xl shadow-slate-300/40">
+      <div className="overflow-hidden rounded-[2rem] bg-slate-950 p-5 text-white shadow-2xl shadow-slate-300/40">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-500 to-cyan-400 text-white">
             <Sparkles size={20} />
@@ -973,15 +955,15 @@ function Sidebar({ activeView, setActiveView, unreadEmails }: SidebarProps) {
           </div>
         </div>
 
-        <div className="mt-5 rounded-3xl bg-white/10 p-4">
+        <div className="mt-5 rounded-3xl border border-white/10 bg-white/10 p-4">
           <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-cyan-200">
             <Wand2 size={14} />
-            IA active
+            PX Sentinel actif
           </div>
 
           <p className="text-sm leading-6 text-white/65">
-            Ton assistant priorise les relances, détecte les signaux et classe
-            tes opportunités.
+            Analyse les relations, détecte les signaux et priorise les actions
+            à fort impact.
           </p>
         </div>
       </div>
@@ -1045,7 +1027,7 @@ function MobileTopBar({
           <p className="truncate text-sm font-black text-slate-950">MyPX</p>
           <p className="flex items-center gap-1 truncate text-xs font-bold text-slate-500">
             <CurrentIcon size={13} />
-            {currentItem?.label || "Dashboard"}
+            {currentItem?.label || "Commandement"}
           </p>
         </div>
       </button>
@@ -1054,7 +1036,7 @@ function MobileTopBar({
         <button
           onClick={() => setActiveView("email_hub")}
           className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm"
-          aria-label="Email"
+          aria-label="Transmissions"
         >
           <InboxIcon size={18} />
           {unreadEmails > 0 && (
@@ -1108,6 +1090,73 @@ function MobileNav({ activeView, setActiveView, unreadEmails }: SidebarProps) {
         })}
       </div>
     </nav>
+  );
+}
+
+function HubHeader({
+  icon,
+  badge,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  badge: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="mb-5 rounded-[2rem] border border-white/80 bg-white/80 p-4 shadow-2xl shadow-violet-100 backdrop-blur-2xl sm:p-6">
+      <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-violet-700">
+        {icon}
+        {badge}
+      </div>
+
+      <h1 className="mt-4 text-2xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl">
+        {title}
+      </h1>
+
+      <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function TabBar<T extends string>({
+  tabs,
+  activeTab,
+  setTab,
+}: {
+  tabs: readonly {
+    key: T;
+    label: string;
+    icon: React.ElementType;
+  }[];
+  activeTab: T;
+  setTab: (tab: T) => void;
+}) {
+  return (
+    <div className="mb-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {tabs.map((item) => {
+        const Icon = item.icon;
+        const active = activeTab === item.key;
+
+        return (
+          <button
+            key={item.key}
+            onClick={() => setTab(item.key)}
+            className={`flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition active:scale-[0.98] ${
+              active
+                ? "bg-slate-950 text-white shadow-xl shadow-slate-300"
+                : "bg-white text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-950"
+            }`}
+          >
+            <Icon size={17} />
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1170,6 +1219,15 @@ function PriorityCard({
 
       <p className="mt-3 text-3xl font-black">{value}</p>
       <p className={`mt-1 text-xs font-bold ${subClasses[tone]}`}>{subtitle}</p>
+    </div>
+  );
+}
+
+function MiniSignal({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+      <p className="text-xs font-bold text-slate-500">{label}</p>
+      <p className="mt-1 text-2xl font-black text-slate-950">{value}</p>
     </div>
   );
 }

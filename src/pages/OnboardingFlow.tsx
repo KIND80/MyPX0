@@ -19,6 +19,13 @@ import {
   UserRound,
   Wand2,
   X,
+  ShieldCheck,
+  Radar,
+  MessageCircle,
+  Eye,
+  Globe,
+  MapPin,
+  AlertCircle,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -66,35 +73,35 @@ export default function OnboardingFlow({ session }: Props) {
     booking_url: "",
     welcome_subject: "Bienvenue {{first_name}}",
     welcome_content:
-      "Bonjour {{first_name}},\n\nRavi de vous compter parmi mes contacts.\n\nÀ bientôt,\n{{advisor_name}}",
+      "Bonjour {{first_name}},\n\nJe suis ravi de vous compter désormais dans mon portefeuille clients.\n\nMon objectif est simple : vous accompagner dans la durée avec des conseils clairs, utiles et adaptés à votre situation.\n\nJe peux également vous accompagner sur vos questions d’assurances, de prévoyance, de fiscalité ou tout autre sujet important pour vous.\n\nN’hésitez pas à me solliciter à tout moment si vous avez une question ou un besoin particulier.\n\nÀ très bientôt,\n{{advisor_name}}",
   });
 
   const checklist = useMemo(
     () => [
       {
-        label: "Nom de l’entreprise",
+        label: "Entreprise renseignée",
         done: Boolean(data.company_name.trim()),
       },
       {
-        label: "Email d’envoi",
+        label: "Email professionnel",
         done: Boolean(data.company_email.trim()),
       },
       {
-        label: "Logo / identité visuelle",
+        label: "Identité visuelle",
         done: Boolean(data.logo_url.trim()),
       },
       {
-        label: "Nom du conseiller",
+        label: "Conseiller identifié",
         done: Boolean(data.advisor_name.trim()),
       },
       {
-        label: "Message Welcome",
+        label: "Message d’accueil prêt",
         done:
           Boolean(data.welcome_subject.trim()) &&
           Boolean(data.welcome_content.trim()),
       },
       {
-        label: "Lien RDV ou WhatsApp",
+        label: "Canal de contact rapide",
         done: Boolean(data.booking_url.trim() || data.whatsapp_url.trim()),
       },
     ],
@@ -117,7 +124,7 @@ export default function OnboardingFlow({ session }: Props) {
     }
 
     if (step === 4 && !data.advisor_name.trim()) {
-      setError("Ajoute ton nom de conseiller pour personnaliser la signature.");
+      setError("Ajoute ton nom pour personnaliser la signature.");
       return false;
     }
 
@@ -177,7 +184,7 @@ export default function OnboardingFlow({ session }: Props) {
         setError(error.message);
         return;
       }
-      
+
       const { error: emailError } = await supabase.rpc("generate_mypx_email", {
         p_user_id: session.user.id,
         p_advisor_name:
@@ -186,12 +193,14 @@ export default function OnboardingFlow({ session }: Props) {
           session.user.email ||
           "user",
       });
-      
+
       if (emailError) {
-        setError(`Profil enregistré, mais erreur email MyPX : ${emailError.message}`);
+        setError(
+          `Profil enregistré, mais erreur email MyPX : ${emailError.message}`
+        );
         return;
       }
-      
+
       window.location.href = "/dashboard?view=home";
     } catch {
       setError("Une erreur est survenue pendant la configuration.");
@@ -207,26 +216,27 @@ export default function OnboardingFlow({ session }: Props) {
       <div className="absolute bottom-[-120px] right-[-120px] h-80 w-80 animate-pulse rounded-full bg-cyan-300/35 blur-3xl" />
 
       {showCoach && (
-        <div className="fixed right-5 top-5 z-50 hidden w-96 rounded-[2rem] border border-white/80 bg-white/90 p-5 shadow-2xl shadow-violet-200/60 backdrop-blur-2xl lg:block">
+        <div className="fixed right-5 top-5 z-50 hidden w-96 rounded-[2rem] border border-white/80 bg-white/90 p-5 shadow-2xl shadow-violet-200/60 backdrop-blur-2xl xl:block">
           <button
             onClick={() => setShowCoach(false)}
-            className="absolute right-4 top-4 rounded-full bg-slate-100 p-2 text-slate-500 hover:text-slate-950"
+            className="absolute right-4 top-4 rounded-full bg-slate-100 p-2 text-slate-500 transition hover:text-slate-950"
+            type="button"
           >
             <X size={15} />
           </button>
 
           <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-violet-700">
             <Sparkles size={14} />
-            Guide MyPX
+            PX Sentinel
           </div>
 
           <h3 className="mt-4 text-xl font-black text-slate-950">
-            Complète ta carte de visite
+            Configure ta base relationnelle
           </h3>
 
           <p className="mt-2 text-sm font-bold leading-6 text-slate-500">
-            Le Welcome Builder est le cœur de MyPX : logo, conseiller, signature
-            et message de bienvenue seront utilisés dans tes emails.
+            Ces informations alimentent tes emails, ta signature, tes campagnes
+            et les futures recommandations de MyPX.
           </p>
 
           <div className="mt-4">
@@ -256,7 +266,7 @@ export default function OnboardingFlow({ session }: Props) {
               <div>
                 <p className="text-xl font-black tracking-tight">MyPX</p>
                 <p className="text-xs font-bold text-slate-500">
-                  Setup intelligent
+                  Portfolio Intelligence
                 </p>
               </div>
             </div>
@@ -264,16 +274,17 @@ export default function OnboardingFlow({ session }: Props) {
             <div className="mt-8 rounded-[1.7rem] bg-slate-950 p-5 text-white">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-cyan-200">
                 <Bot size={14} />
-                Assistant IA
+                Initialisation PX Sentinel
               </div>
 
               <h1 className="text-3xl font-black leading-tight tracking-tight">
-                Configure ta carte de visite intelligente.
+                Crée ton identité commerciale intelligente.
               </h1>
 
               <p className="mt-4 text-sm leading-7 text-white/60">
-                Ces informations alimentent tes emails, signatures, relances,
-                campagnes et recommandations IA.
+                Avant d’utiliser ton centre de commandement, MyPX doit connaître
+                ton entreprise, ton profil, ta signature et ton message
+                d’accueil.
               </p>
             </div>
 
@@ -343,8 +354,9 @@ export default function OnboardingFlow({ session }: Props) {
             </div>
 
             {error && (
-              <div className="mb-5 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-black text-rose-700">
-                {error}
+              <div className="mb-5 flex items-start gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-black text-rose-700">
+                <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
@@ -352,27 +364,35 @@ export default function OnboardingFlow({ session }: Props) {
               <StepShell
                 icon={<Wand2 size={23} />}
                 title="Bienvenue dans MyPX"
-                subtitle="Avant d’utiliser le CRM, on configure ton identité professionnelle."
+                subtitle="On configure ton identité avant d’entrer dans ton centre de commandement."
               >
                 <div className="rounded-[1.6rem] border border-violet-100 bg-violet-50/70 p-5">
                   <p className="text-sm leading-7 text-slate-600">
-                    L’objectif est simple : créer une base propre pour que tous
-                    tes emails, cartes de contact, relances et messages IA
-                    soient cohérents dès le départ.
+                    Cette configuration permet à MyPX de personnaliser tes
+                    emails, tes signatures, tes campagnes, tes relances et ton
+                    expérience IA. Plus ton profil est complet, plus ton
+                    portefeuille devient clair et exploitable.
                   </p>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-3">
-                  {["Carte de visite", "Signature", "Welcome email"].map(
-                    (item) => (
-                      <div
-                        key={item}
-                        className="rounded-2xl bg-white p-4 text-center text-sm font-black shadow-sm"
-                      >
-                        {item}
-                      </div>
-                    )
-                  )}
+                  {[
+                    ["Identité", "Entreprise et logo"],
+                    ["Signature", "Conseiller et contact"],
+                    ["Accueil", "Email de bienvenue"],
+                  ].map(([title, subtitle]) => (
+                    <div
+                      key={title}
+                      className="rounded-2xl bg-white p-4 text-center shadow-sm"
+                    >
+                      <p className="text-sm font-black text-slate-950">
+                        {title}
+                      </p>
+                      <p className="mt-1 text-xs font-bold text-slate-400">
+                        {subtitle}
+                      </p>
+                    </div>
+                  ))}
                 </div>
 
                 <ButtonRow>
@@ -387,7 +407,7 @@ export default function OnboardingFlow({ session }: Props) {
               <StepShell
                 icon={<Building2 size={23} />}
                 title="Entreprise"
-                subtitle="Ces infos apparaîtront dans tes emails et ta signature."
+                subtitle="Ces informations apparaîtront dans tes emails, ta signature et tes communications."
               >
                 <InputField
                   icon={<Building2 size={15} />}
@@ -412,14 +432,14 @@ export default function OnboardingFlow({ session }: Props) {
                 />
 
                 <InputField
-                  icon={<Sparkles size={15} />}
+                  icon={<Globe size={15} />}
                   placeholder="Site internet"
                   value={data.company_website}
                   onChange={(value) => update("company_website", value)}
                 />
 
                 <InputField
-                  icon={<Building2 size={15} />}
+                  icon={<MapPin size={15} />}
                   placeholder="Adresse entreprise"
                   value={data.company_address}
                   onChange={(value) => update("company_address", value)}
@@ -440,7 +460,7 @@ export default function OnboardingFlow({ session }: Props) {
               <StepShell
                 icon={<Palette size={23} />}
                 title="Image de marque"
-                subtitle="Ajoute ton logo et ta couleur principale."
+                subtitle="Ajoute ton logo et choisis la couleur principale utilisée dans tes emails."
               >
                 <LogoUpload
                   userId={session.user.id}
@@ -478,6 +498,9 @@ export default function OnboardingFlow({ session }: Props) {
                   <p className="mt-2 text-2xl font-black">
                     {data.company_name || "Votre entreprise"}
                   </p>
+                  <p className="mt-1 text-sm font-medium opacity-80">
+                    Cette couleur sera utilisée dans ta signature et tes emails.
+                  </p>
                 </div>
 
                 <ButtonRow>
@@ -495,7 +518,7 @@ export default function OnboardingFlow({ session }: Props) {
               <StepShell
                 icon={<UserRound size={23} />}
                 title="Profil conseiller"
-                subtitle="Cette partie crée ta vraie carte de visite relationnelle."
+                subtitle="Cette partie personnalise ta signature et humanise tes communications."
               >
                 <InputField
                   icon={<UserRound size={15} />}
@@ -506,7 +529,7 @@ export default function OnboardingFlow({ session }: Props) {
                 />
 
                 <InputField
-                  icon={<Sparkles size={15} />}
+                  icon={<ShieldCheck size={15} />}
                   placeholder="Rôle / fonction"
                   value={data.advisor_role}
                   onChange={(value) => update("advisor_role", value)}
@@ -547,11 +570,12 @@ export default function OnboardingFlow({ session }: Props) {
               <StepShell
                 icon={<Send size={23} />}
                 title="Email de bienvenue"
-                subtitle="C’est le message central envoyé aux nouveaux contacts."
+                subtitle="Ce message peut être envoyé aux nouveaux contacts pour ouvrir une relation professionnelle propre."
               >
                 <div className="rounded-[1.6rem] border border-amber-100 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-800">
-                  Cette étape est importante : elle paramètre ton premier
-                  contact professionnel avec chaque client ajouté.
+                  Utilise un message simple, humain et professionnel. Il doit
+                  rassurer le client et lui rappeler qu’il peut te solliciter
+                  facilement.
                 </div>
 
                 <InputField
@@ -566,13 +590,15 @@ export default function OnboardingFlow({ session }: Props) {
                   placeholder="Contenu de l’email"
                   value={data.welcome_content}
                   onChange={(e) => update("welcome_content", e.target.value)}
-                  className="min-h-[180px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold leading-7 text-slate-950 shadow-sm outline-none placeholder:text-slate-300 transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+                  className="min-h-[220px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold leading-7 text-slate-950 shadow-sm outline-none placeholder:text-slate-300 transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
                 />
 
                 <div className="rounded-2xl bg-slate-50 p-4 text-xs font-bold leading-6 text-slate-500">
                   Variables disponibles : {"{{first_name}}"}, {"{{last_name}}"},{" "}
                   {"{{advisor_name}}"}, {"{{company_name}}"}
                 </div>
+
+                <EmailPreview data={data} />
 
                 <ButtonRow>
                   <SecondaryButton onClick={prev}>
@@ -588,23 +614,33 @@ export default function OnboardingFlow({ session }: Props) {
             {step === 6 && (
               <StepShell
                 icon={<CheckCircle2 size={23} />}
-                title="Votre espace est prêt"
-                subtitle="MyPX va maintenant utiliser ces informations dans l’application."
+                title="Ton espace est prêt"
+                subtitle="MyPX va maintenant utiliser ces informations dans ton application."
               >
                 <div className="rounded-[1.7rem] bg-slate-950 p-5 text-white">
-                  <div
-                    className="mb-4 h-16 w-16 rounded-2xl shadow-xl"
-                    style={{ backgroundColor: data.main_color }}
-                  />
+                  <div className="flex items-start gap-4">
+                    <div
+                      className="h-16 w-16 shrink-0 rounded-2xl shadow-xl"
+                      style={{ backgroundColor: data.main_color }}
+                    />
 
-                  <p className="text-2xl font-black">
-                    {data.company_name || "Votre entreprise"}
-                  </p>
+                    <div>
+                      <p className="text-2xl font-black">
+                        {data.company_name || "Votre entreprise"}
+                      </p>
 
-                  <p className="mt-2 text-sm leading-7 text-white/60">
-                    Votre configuration servira aux emails, signatures, relances
-                    et futures opportunités IA.
-                  </p>
+                      <p className="mt-2 text-sm leading-7 text-white/60">
+                        Ton identité est prête pour les emails, signatures,
+                        campagnes, relances et futures opportunités IA.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <MiniReady icon={<Radar size={16} />} label="PX Sentinel" />
+                    <MiniReady icon={<Mail size={16} />} label="Emails" />
+                    <MiniReady icon={<Wand2 size={16} />} label="Relances IA" />
+                  </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-100 bg-white p-4 text-sm shadow-sm">
@@ -621,7 +657,7 @@ export default function OnboardingFlow({ session }: Props) {
                   {loading ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      Enregistrement...
+                      Initialisation...
                     </>
                   ) : (
                     <>
@@ -703,6 +739,48 @@ function InputField({
   );
 }
 
+function EmailPreview({ data }: { data: OnboardingData }) {
+  const previewSubject = replaceVariables(data.welcome_subject, data);
+  const previewContent = replaceVariables(data.welcome_content, data);
+
+  return (
+    <div className="rounded-[1.6rem] border border-violet-100 bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-violet-700">
+        <Eye size={14} />
+        Aperçu email
+      </div>
+
+      <div className="rounded-2xl bg-slate-50 p-4">
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+          Objet
+        </p>
+        <p className="mt-1 text-sm font-black text-slate-950">
+          {previewSubject || "Sans objet"}
+        </p>
+
+        <div className="my-4 h-px bg-slate-200" />
+
+        <p className="whitespace-pre-line text-sm leading-7 text-slate-600">
+          {previewContent || "Aucun contenu"}
+        </p>
+
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+          <p className="text-sm font-black text-slate-950">
+            {data.advisor_name || "Votre nom"}
+          </p>
+          <p className="text-xs font-bold text-slate-500">
+            {data.advisor_role || "Votre fonction"} ·{" "}
+            {data.company_name || "Votre entreprise"}
+          </p>
+          <p className="mt-2 text-xs font-semibold text-slate-400">
+            {data.company_email || "email@entreprise.com"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ButtonRow({ children }: { children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>
@@ -756,6 +834,21 @@ function SecondaryButton({
   );
 }
 
+function MiniReady({
+  icon,
+  label,
+}: {
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-2 rounded-2xl bg-white/10 px-3 py-3 text-xs font-black text-white">
+      {icon}
+      {label}
+    </div>
+  );
+}
+
 function SummaryLine({ label, value }: { label: string; value: string }) {
   return (
     <p className="flex items-center justify-between gap-4 border-b border-slate-100 py-3 last:border-b-0">
@@ -765,4 +858,12 @@ function SummaryLine({ label, value }: { label: string; value: string }) {
       </span>
     </p>
   );
+}
+
+function replaceVariables(value: string, data: OnboardingData) {
+  return value
+    .replaceAll("{{first_name}}", "Alexandre")
+    .replaceAll("{{last_name}}", "Martin")
+    .replaceAll("{{advisor_name}}", data.advisor_name || "Votre nom")
+    .replaceAll("{{company_name}}", data.company_name || "Votre entreprise");
 }

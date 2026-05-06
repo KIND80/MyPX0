@@ -12,6 +12,8 @@ import {
   X,
   Search,
   Mail,
+  Radio,
+  Sparkles,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -121,22 +123,30 @@ const buildEmailSignature = (onboarding: UserOnboarding | null) => {
         <div style="min-width:180px;">
           ${
             advisorName
-              ? `<div style="font-size:15px;font-weight:700;">${escapeHtml(advisorName)}</div>`
+              ? `<div style="font-size:15px;font-weight:700;">${escapeHtml(
+                  advisorName
+                )}</div>`
               : ""
           }
           ${
             advisorRole
-              ? `<div style="font-size:13px;color:#6b7280;margin-top:2px;">${escapeHtml(advisorRole)}</div>`
+              ? `<div style="font-size:13px;color:#6b7280;margin-top:2px;">${escapeHtml(
+                  advisorRole
+                )}</div>`
               : ""
           }
           ${
             companyName
-              ? `<div style="font-size:13px;font-weight:600;margin-top:6px;">${escapeHtml(companyName)}</div>`
+              ? `<div style="font-size:13px;font-weight:600;margin-top:6px;">${escapeHtml(
+                  companyName
+                )}</div>`
               : ""
           }
           ${
             companyAddress
-              ? `<div style="font-size:12px;color:#6b7280;margin-top:2px;">${escapeHtml(companyAddress)}</div>`
+              ? `<div style="font-size:12px;color:#6b7280;margin-top:2px;">${escapeHtml(
+                  companyAddress
+                )}</div>`
               : ""
           }
           <div style="font-size:12px;color:#6b7280;margin-top:8px;line-height:1.6;">
@@ -144,26 +154,38 @@ const buildEmailSignature = (onboarding: UserOnboarding | null) => {
             ${companyEmail ? `✉️ ${escapeHtml(companyEmail)}<br />` : ""}
             ${
               companyWebsite
-                ? `🌐 <a href="${escapeHtml(companyWebsite)}" style="color:${escapeHtml(mainColor)};">${escapeHtml(companyWebsite)}</a><br />`
+                ? `🌐 <a href="${escapeHtml(
+                    companyWebsite
+                  )}" style="color:${escapeHtml(mainColor)};">${escapeHtml(
+                    companyWebsite
+                  )}</a><br />`
                 : ""
             }
           </div>
           <div style="margin-top:10px;">
             ${
               whatsappUrl
-                ? `<a href="${escapeHtml(whatsappUrl)}" style="display:inline-block;margin-right:8px;background:#22c55e;color:#fff;text-decoration:none;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;">WhatsApp</a>`
+                ? `<a href="${escapeHtml(
+                    whatsappUrl
+                  )}" style="display:inline-block;margin-right:8px;background:#22c55e;color:#fff;text-decoration:none;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;">WhatsApp</a>`
                 : ""
             }
             ${
               bookingUrl
-                ? `<a href="${escapeHtml(bookingUrl)}" style="display:inline-block;background:${escapeHtml(mainColor)};color:#fff;text-decoration:none;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;">Prendre RDV</a>`
+                ? `<a href="${escapeHtml(
+                    bookingUrl
+                  )}" style="display:inline-block;background:${escapeHtml(
+                    mainColor
+                  )};color:#fff;text-decoration:none;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;">Prendre RDV</a>`
                 : ""
             }
           </div>
         </div>
         ${
           logoUrl
-            ? `<div style="margin-left:auto;"><img src="${escapeHtml(logoUrl)}" alt="Logo" style="max-width:90px;max-height:50px;object-fit:contain;" /></div>`
+            ? `<div style="margin-left:auto;"><img src="${escapeHtml(
+                logoUrl
+              )}" alt="Logo" style="max-width:90px;max-height:50px;object-fit:contain;" /></div>`
             : ""
         }
       </div>
@@ -402,38 +424,43 @@ export default function Inbox({ session }: Props) {
   const selectedPreview = selectedEmail ? getEmailPreview(selectedEmail) : "";
 
   return (
-    <div className="min-h-screen text-slate-950">
-      <div className="mb-5 overflow-hidden rounded-[1.75rem] bg-slate-950 p-5 text-white shadow-xl sm:p-6 lg:rounded-[2rem]">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+    <div className="min-h-screen space-y-5 text-white">
+      <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#0B1020] p-5 shadow-2xl shadow-violet-950/30 sm:p-6">
+        <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-violet-600/20 blur-3xl" />
+        <div className="absolute -bottom-28 left-8 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" />
+
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-200 sm:text-xs">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-200 sm:text-xs">
               <InboxIcon size={14} />
-              Boîte mail MyPX
+              Centre des transmissions
             </div>
 
             <h1 className="mt-4 text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">
               Réponses clients reçues
             </h1>
 
-            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-white/60">
-              Centralise les réponses clients, lis les messages entrants et
-              réponds directement avec ta signature MyPX.
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-400">
+              PX Sentinel centralise les réponses entrantes, détecte les
+              messages non lus et te permet de répondre avec ta signature MyPX.
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center">
             <button
               onClick={loadEmails}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 py-3 text-xs font-black text-white transition hover:bg-white/15 active:scale-[0.98]"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black text-white transition hover:bg-white/10 active:scale-[0.98]"
             >
               <RefreshCw size={15} />
-              Actualiser
+              Scanner
             </button>
 
-            <div className="rounded-2xl bg-white/10 px-4 py-3 text-center sm:px-5">
-              <p className="text-2xl font-black sm:text-3xl">{unreadCount}</p>
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/50 sm:text-xs">
-                non lus
+            <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-center sm:px-5">
+              <p className="text-2xl font-black text-rose-100 sm:text-3xl">
+                {unreadCount}
+              </p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-rose-200/60 sm:text-xs">
+                signaux non lus
               </p>
             </div>
           </div>
@@ -441,43 +468,50 @@ export default function Inbox({ session }: Props) {
       </div>
 
       {loading ? (
-        <div className="flex min-h-[360px] items-center justify-center rounded-[1.75rem] bg-white shadow-sm">
-          <Loader2 className="animate-spin text-slate-400" size={32} />
+        <div className="flex min-h-[360px] items-center justify-center rounded-[2rem] border border-white/10 bg-white/[0.04] shadow-sm">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="animate-spin text-violet-300" size={32} />
+            <p className="text-sm font-bold text-slate-400">
+              PX Sentinel analyse les transmissions...
+            </p>
+          </div>
         </div>
       ) : errorMessage ? (
-        <div className="rounded-[1.75rem] border border-rose-100 bg-rose-50 p-5 text-sm font-bold text-rose-700">
+        <div className="rounded-[1.75rem] border border-rose-400/20 bg-rose-500/10 p-5 text-sm font-bold text-rose-200">
           Erreur Inbox : {errorMessage}
         </div>
       ) : emails.length === 0 ? (
-        <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm sm:p-10">
-          <InboxIcon className="mx-auto text-slate-300" size={42} />
-          <h2 className="mt-4 text-xl font-black">Aucun email reçu</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm font-semibold leading-6 text-slate-500">
+        <div className="rounded-[1.75rem] border border-dashed border-white/10 bg-white/[0.04] p-8 text-center shadow-sm sm:p-10">
+          <InboxIcon className="mx-auto text-slate-600" size={42} />
+          <h2 className="mt-4 text-xl font-black text-white">
+            Aucune transmission reçue
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-sm font-semibold leading-6 text-slate-400">
             Dès qu’un client répondra à une adresse MyPX, son message apparaîtra
-            ici.
+            ici dans ton centre de renseignement relationnel.
           </p>
         </div>
       ) : (
         <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
-          <aside className="rounded-[1.75rem] bg-white p-3 shadow-sm sm:p-4">
-            <div className="mb-4 flex items-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2.5">
-              <Search size={16} className="text-slate-400" />
+          <aside className="rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-3 shadow-sm backdrop-blur-2xl sm:p-4">
+            <div className="mb-4 flex items-center gap-2 rounded-2xl border border-white/10 bg-[#121A2F]/80 px-3 py-2.5">
+              <Search size={16} className="text-slate-500" />
               <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Rechercher un email..."
-                className="w-full bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400"
+                placeholder="Rechercher une transmission..."
+                className="w-full bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-500"
               />
             </div>
 
             <div className="max-h-[520px] space-y-3 overflow-y-auto pr-1 xl:max-h-[calc(100vh-270px)]">
               {filteredEmails.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center">
-                  <Mail className="mx-auto text-slate-300" size={30} />
-                  <p className="mt-3 text-sm font-black text-slate-700">
-                    Aucun résultat
+                <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center">
+                  <Mail className="mx-auto text-slate-600" size={30} />
+                  <p className="mt-3 text-sm font-black text-white">
+                    Aucun signal trouvé
                   </p>
-                  <p className="mt-1 text-xs font-semibold text-slate-400">
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
                     Essaie avec un nom, un email ou un objet.
                   </p>
                 </div>
@@ -496,8 +530,8 @@ export default function Inbox({ session }: Props) {
                       }}
                       className={`w-full rounded-[1.35rem] border p-4 text-left transition active:scale-[0.99] ${
                         isSelected
-                          ? "border-slate-950 bg-slate-950 text-white shadow-xl"
-                          : "border-slate-100 bg-white text-slate-950 shadow-sm hover:border-slate-300 hover:bg-slate-50"
+                          ? "border-violet-400/40 bg-violet-600/20 text-white shadow-xl shadow-violet-950/20"
+                          : "border-white/10 bg-[#121A2F]/80 text-white shadow-sm hover:border-violet-400/30 hover:bg-[#18213a]"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -505,18 +539,14 @@ export default function Inbox({ session }: Props) {
                           <p className="truncate text-sm font-black">
                             {getClientName(email)}
                           </p>
-                          <p
-                            className={`mt-1 truncate text-xs font-semibold ${
-                              isSelected ? "text-white/50" : "text-slate-400"
-                            }`}
-                          >
+                          <p className="mt-1 truncate text-xs font-semibold text-slate-500">
                             {email.from_email}
                           </p>
                         </div>
 
                         {isUnread && (
                           <span className="shrink-0 rounded-full bg-rose-500 px-2 py-1 text-[9px] font-black uppercase text-white">
-                            Nouveau
+                            Signal
                           </span>
                         )}
                       </div>
@@ -525,19 +555,11 @@ export default function Inbox({ session }: Props) {
                         {email.subject || "Sans objet"}
                       </p>
 
-                      <p
-                        className={`mt-2 line-clamp-2 text-xs font-semibold leading-5 ${
-                          isSelected ? "text-white/60" : "text-slate-500"
-                        }`}
-                      >
+                      <p className="mt-2 line-clamp-2 text-xs font-semibold leading-5 text-slate-400">
                         {getEmailPreview(email)}
                       </p>
 
-                      <p
-                        className={`mt-3 text-[11px] font-bold ${
-                          isSelected ? "text-white/40" : "text-slate-400"
-                        }`}
-                      >
+                      <p className="mt-3 text-[11px] font-bold text-slate-500">
                         {new Date(email.created_at).toLocaleString("fr-FR")}
                       </p>
                     </button>
@@ -547,28 +569,33 @@ export default function Inbox({ session }: Props) {
             </div>
           </aside>
 
-          <main className="rounded-[1.75rem] bg-white p-4 shadow-sm sm:p-5 lg:p-6">
+          <main className="rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-4 shadow-sm backdrop-blur-2xl sm:p-5 lg:p-6">
             {selectedEmail ? (
               <>
-                <div className="flex flex-col gap-5 border-b border-slate-100 pb-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex flex-col gap-5 border-b border-white/10 pb-5 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
-                    <h2 className="break-words text-xl font-black leading-tight sm:text-2xl">
+                    <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-violet-200">
+                      <Radio size={13} />
+                      Transmission entrante
+                    </div>
+
+                    <h2 className="break-words text-xl font-black leading-tight text-white sm:text-2xl">
                       {selectedEmail.subject || "Sans objet"}
                     </h2>
 
                     <div className="mt-4 flex items-start gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300">
                         <UserRound size={20} />
                       </div>
 
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-black">
+                        <p className="truncate text-sm font-black text-white">
                           {getClientName(selectedEmail)}
                         </p>
-                        <p className="break-all text-xs font-semibold text-slate-400">
+                        <p className="break-all text-xs font-semibold text-slate-500">
                           {selectedEmail.from_email}
                         </p>
-                        <p className="mt-1 text-[11px] font-bold text-slate-400">
+                        <p className="mt-1 text-[11px] font-bold text-slate-500">
                           Reçu le{" "}
                           {new Date(selectedEmail.created_at).toLocaleString(
                             "fr-FR"
@@ -582,7 +609,7 @@ export default function Inbox({ session }: Props) {
                     {selectedEmail.status !== "read" && (
                       <button
                         onClick={() => markAsRead(selectedEmail.id)}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-xs font-black text-white transition hover:bg-slate-800 active:scale-[0.98]"
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-xs font-black text-slate-950 transition hover:bg-violet-100 active:scale-[0.98]"
                       >
                         <MailOpen size={15} />
                         Marquer lu
@@ -591,7 +618,7 @@ export default function Inbox({ session }: Props) {
 
                     <button
                       onClick={() => setReplyOpen(true)}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-700 px-4 py-3 text-xs font-black text-white transition hover:bg-violet-800 active:scale-[0.98]"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-xs font-black text-white transition hover:bg-violet-500 active:scale-[0.98]"
                     >
                       <Reply size={15} />
                       Répondre
@@ -600,38 +627,42 @@ export default function Inbox({ session }: Props) {
                     {selectedEmail.client_id && (
                       <a
                         href={`/dashboard?client=${selectedEmail.client_id}`}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-xs font-black text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black text-slate-200 transition hover:bg-white/10 active:scale-[0.98]"
                       >
                         <ExternalLink size={15} />
-                        Ouvrir fiche
+                        Ouvrir dossier
                       </a>
                     )}
                   </div>
                 </div>
 
-                <div className="mt-5 overflow-hidden rounded-[1.5rem] bg-slate-50 p-4 sm:p-5">
+                <div className="mt-5 overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#121A2F]/80 p-4 sm:p-5">
                   {selectedEmail.html_content ? (
                     <div
-                      className="prose prose-sm max-w-none overflow-x-auto text-slate-700 prose-img:max-w-full prose-a:break-all"
+                      className="prose prose-sm max-w-none overflow-x-auto rounded-2xl bg-white p-4 text-slate-800 prose-img:max-w-full prose-a:break-all sm:p-5"
                       dangerouslySetInnerHTML={{
                         __html: cleanHtml(selectedEmail.html_content),
                       }}
                     />
                   ) : (
-                    <p className="whitespace-pre-wrap break-words text-sm font-semibold leading-8 text-slate-700">
+                    <p className="whitespace-pre-wrap break-words text-sm font-semibold leading-8 text-slate-300">
                       {selectedPreview || "Aucun contenu texte disponible."}
                     </p>
                   )}
                 </div>
 
                 {replyOpen && (
-                  <div className="mt-5 rounded-[1.5rem] border border-violet-100 bg-violet-50 p-4 sm:p-5">
+                  <div className="mt-5 rounded-[1.5rem] border border-violet-400/20 bg-violet-500/10 p-4 sm:p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-black text-slate-950">
-                          Répondre depuis MyPX
-                        </p>
-                        <p className="mt-1 break-all text-xs font-semibold text-slate-500">
+                        <div className="flex items-center gap-2">
+                          <Sparkles size={15} className="text-violet-200" />
+                          <p className="text-sm font-black text-white">
+                            Déployer une réponse
+                          </p>
+                        </div>
+
+                        <p className="mt-1 break-all text-xs font-semibold text-slate-400">
                           À : {selectedEmail.from_email}
                         </p>
                       </div>
@@ -641,7 +672,7 @@ export default function Inbox({ session }: Props) {
                           setReplyOpen(false);
                           setReplyContent("");
                         }}
-                        className="shrink-0 rounded-xl bg-white p-2 text-slate-500 transition hover:text-slate-950"
+                        className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
                       >
                         <X size={16} />
                       </button>
@@ -651,19 +682,20 @@ export default function Inbox({ session }: Props) {
                       value={replyContent}
                       onChange={(e) => setReplyContent(e.target.value)}
                       rows={8}
-                      className="mt-4 w-full resize-none rounded-2xl border border-violet-100 bg-white p-4 text-sm font-semibold leading-7 text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+                      className="mt-4 w-full resize-none rounded-2xl border border-white/10 bg-[#121A2F] p-4 text-sm font-semibold leading-7 text-white outline-none transition placeholder:text-slate-500 focus:border-violet-400/40 focus:ring-4 focus:ring-violet-500/10"
                       placeholder="Écris ta réponse ici..."
                     />
 
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-xs font-semibold leading-5 text-slate-500">
-                        Ta signature MyPX sera ajoutée automatiquement.
+                      <p className="text-xs font-semibold leading-5 text-slate-400">
+                        Ta signature MyPX sera ajoutée automatiquement à la
+                        transmission.
                       </p>
 
                       <button
                         onClick={sendReply}
                         disabled={sendingReply}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-300 transition hover:bg-slate-800 active:scale-[0.98] disabled:opacity-60 sm:w-auto"
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-violet-950/30 transition hover:bg-violet-100 active:scale-[0.98] disabled:opacity-60 sm:w-auto"
                       >
                         {sendingReply ? (
                           <Loader2 size={16} className="animate-spin" />
@@ -677,8 +709,8 @@ export default function Inbox({ session }: Props) {
                 )}
               </>
             ) : (
-              <div className="flex min-h-[320px] items-center justify-center rounded-[1.5rem] bg-slate-50 text-sm font-bold text-slate-400">
-                Sélectionne un email.
+              <div className="flex min-h-[320px] items-center justify-center rounded-[1.5rem] border border-white/10 bg-[#121A2F]/80 text-sm font-bold text-slate-500">
+                Sélectionne une transmission.
               </div>
             )}
           </main>

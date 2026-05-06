@@ -154,6 +154,17 @@ const escapeHtml = (value: string) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
+const getRelationLabel = (client: Client) => {
+  const score = client.ai_score || client.score || 0;
+
+  if (client.status === "chaud" || score >= 80) return "Signal chaud";
+  if (client.status === "a_relancer") return "Attention requise";
+  if (client.status === "client") return "Relation active";
+  if (score >= 50) return "Potentiel latent";
+
+  return "Relation à observer";
+};
+
 const buildEmailSignature = (onboarding: UserOnboarding | null) => {
   if (!onboarding) return "";
 
@@ -356,7 +367,7 @@ export default function ClientDetail({
       emailLogs?.map((item) => ({
         id: item.id,
         type: "email",
-        title: item.subject || "Email envoyé",
+        title: item.subject || "Transmission envoyée",
         content: item.content || "",
         created_at: item.created_at,
       })) || [];
@@ -365,7 +376,7 @@ export default function ClientDetail({
       inboundEmails?.map((item) => ({
         id: item.id,
         type: "email_received",
-        title: item.subject || "Email reçu",
+        title: item.subject || "Transmission reçue",
         content: item.text_content || item.html_content || "",
         created_at: item.created_at,
         status: item.status,
@@ -377,7 +388,7 @@ export default function ClientDetail({
       notes?.map((item) => ({
         id: item.id,
         type: "note",
-        title: "Note",
+        title: "Renseignement ajouté",
         content: item.note,
         created_at: item.created_at,
       })) || [];
@@ -386,7 +397,7 @@ export default function ClientDetail({
       followUps?.map((item) => ({
         id: item.id,
         type: "follow_up",
-        title: item.title || "Relance",
+        title: item.title || "Action prioritaire",
         content: item.note || item.status || "",
         created_at: item.created_at,
       })) || [];
@@ -517,8 +528,8 @@ export default function ClientDetail({
     const { error } = await supabase.from("follow_ups").insert({
       user_id: session.user.id,
       client_id: clientId,
-      title: "Relance client",
-      note: "Relance créée depuis la fiche client.",
+      title: "Action prioritaire",
+      note: "Action créée depuis le dossier relationnel.",
       due_date: tomorrow.toISOString(),
       priority: "normal",
       status: "pending",
@@ -540,12 +551,12 @@ export default function ClientDetail({
 
   const createCustomFollowUp = async () => {
     if (!followUpDate) {
-      alert("Choisis une date de relance.");
+      alert("Choisis une date d’action.");
       return;
     }
 
     if (!followUpTitle.trim()) {
-      alert("Ajoute un titre de relance.");
+      alert("Ajoute un titre d’action.");
       return;
     }
 
@@ -638,7 +649,7 @@ export default function ClientDetail({
         .eq("id", client.id)
         .eq("user_id", session.user.id);
 
-      alert("Erreur pendant l’analyse IA.");
+      alert("PX Sentinel n’a pas pu terminer l’analyse.");
     } finally {
       setEnrichingAI(false);
     }
@@ -678,11 +689,11 @@ export default function ClientDetail({
         angle:
           data?.angle ||
           client.next_best_action ||
-          "Reprendre contact avec une approche personnalisée",
+          "Approche relationnelle personnalisée",
         reason:
           data?.reason ||
           client.ai_summary ||
-          "L’IA utilise les informations disponibles dans la fiche client pour proposer un angle de conversation.",
+          "PX Sentinel utilise les renseignements disponibles dans ce dossier pour proposer le meilleur angle d’approche.",
         message:
           data?.message ||
           client.suggested_message ||
@@ -696,9 +707,9 @@ export default function ClientDetail({
       console.error("Erreur conversation-opportunity:", error);
 
       setConversationOpportunity({
-        angle: "Relance personnalisée basée sur la fiche client",
+        angle: "Approche personnalisée basée sur le dossier",
         reason:
-          "La fonction IA externe n’est pas encore disponible, donc MyPX propose une opportunité locale à partir des données déjà présentes.",
+          "PX Sentinel utilise les données déjà présentes dans le dossier pour proposer une action locale.",
         message: `Bonjour ${
           client.first_name || ""
         },\n\nJe me permets de revenir vers vous car votre profil semble présenter une opportunité intéressante à explorer.\n\nL’idée serait simplement d’échanger quelques minutes pour voir si je peux vous apporter une solution utile selon votre situation actuelle.\n\nSeriez-vous disponible cette semaine ?`,
@@ -710,7 +721,7 @@ export default function ClientDetail({
 
   const sendManualEmail = async () => {
     if (!client?.email) {
-      alert("Ce client n’a pas d’adresse email.");
+      alert("Ce dossier n’a pas d’adresse email.");
       return;
     }
 
@@ -767,7 +778,7 @@ export default function ClientDetail({
       setEmailSubject("");
       setEmailContent("");
     } else {
-      alert("Email non envoyé. Vérifie la Edge Function send-email.");
+      alert("Transmission non envoyée. Vérifie la Edge Function send-email.");
     }
 
     setSendingEmail(false);
@@ -776,9 +787,12 @@ export default function ClientDetail({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-3 rounded-[2rem] border border-white/75 bg-white/70 p-6 text-sm font-bold text-slate-500 shadow-xl backdrop-blur-2xl">
-        <Loader2 size={18} className="animate-spin" />
-        Chargement de la fiche client...
+      <div className="relative overflow-hidden rounded-[2rem] border border-violet-100 bg-slate-950 p-6 text-white shadow-2xl">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.35),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.25),transparent_35%)]" />
+        <div className="relative flex items-center gap-3 text-sm font-black">
+          <Loader2 size={18} className="animate-spin text-violet-300" />
+          PX Sentinel ouvre le dossier relationnel...
+        </div>
       </div>
     );
   }
@@ -786,13 +800,15 @@ export default function ClientDetail({
   if (!client) {
     return (
       <div className="rounded-[2rem] border border-white/75 bg-white/70 p-6 text-sm font-bold text-slate-500 shadow-xl backdrop-blur-2xl">
-        Client introuvable.
+        Dossier introuvable.
       </div>
     );
   }
 
   const fullName =
     [client.first_name, client.last_name].filter(Boolean).join(" ") || "Client";
+
+  const relationLabel = getRelationLabel(client);
 
   return (
     <div className="space-y-6">
@@ -801,105 +817,79 @@ export default function ClientDetail({
         className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:text-slate-950"
       >
         <ArrowLeft size={16} />
-        Retour clients
+        Retour aux dossiers
       </button>
 
-      <section className="rounded-[2rem] border border-white/75 bg-white/70 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:p-6">
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-950 p-5 text-white shadow-2xl shadow-violet-950/30 sm:p-6">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.40),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.25),transparent_34%)]" />
+        <div className="absolute right-6 top-6 h-32 w-32 rounded-full border border-violet-400/20 bg-violet-500/10 blur-sm" />
+
+        <div className="relative">
+          <SectionHeader
+            icon={<User size={16} />}
+            eyebrow="Dossier relationnel"
+            title={fullName}
+            description={`PX Sentinel surveille ce dossier. Statut actuel : ${relationLabel}.`}
+            action={
+              <button
+                onClick={saveClient}
+                disabled={savingClient}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 disabled:opacity-60"
+              >
+                {savingClient ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Save size={16} />
+                )}
+                Sauvegarder le dossier
+              </button>
+            }
+            dark
+          />
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <ScoreCard
+              icon={<Sparkles size={16} />}
+              label="Température relationnelle"
+              value={client.score || 0}
+              sub="Score commercial calculé"
+              tone="emerald"
+            />
+            <ScoreCard
+              icon={<Bot size={16} />}
+              label="Indice PX Sentinel"
+              value={client.ai_score || 0}
+              sub={client.ai_status || "Non analysé"}
+              tone="cyan"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[2rem] border border-white/75 bg-white/80 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:p-6">
         <SectionHeader
-          icon={<User size={16} />}
-          eyebrow="Fiche client"
-          title={fullName}
-          description="Gère les informations, notes, relances, emails et opportunités IA du client."
-          action={
-            <button
-              onClick={saveClient}
-              disabled={savingClient}
-              className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-300 disabled:opacity-60"
-            >
-              {savingClient ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Save size={16} />
-              )}
-              Enregistrer
-            </button>
-          }
+          icon={<Building2 size={16} />}
+          eyebrow="Identité du dossier"
+          title="Informations stratégiques"
+          description="Centralise les coordonnées, le potentiel, le statut et les renseignements de base."
+          action={null}
         />
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <ScoreCard
-            icon={<Sparkles size={16} />}
-            label="Score client"
-            value={client.score || 0}
-            sub="Score commercial calculé"
-            tone="emerald"
-          />
-          <ScoreCard
-            icon={<Bot size={16} />}
-            label="Score IA"
-            value={client.ai_score || 0}
-            sub={client.ai_status || "Non analysé"}
-            tone="cyan"
-          />
-        </div>
-
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <FieldInput
-            icon={<User size={14} />}
-            value={client.first_name || ""}
-            onChange={(v) => updateClientField("first_name", v)}
-            placeholder="Prénom"
-          />
-          <FieldInput
-            icon={<User size={14} />}
-            value={client.last_name || ""}
-            onChange={(v) => updateClientField("last_name", v)}
-            placeholder="Nom"
-          />
-          <FieldInput
-            icon={<Mail size={14} />}
-            value={client.email || ""}
-            onChange={(v) => updateClientField("email", v)}
-            placeholder="Email"
-          />
-          <FieldInput
-            icon={<Phone size={14} />}
-            value={client.phone || ""}
-            onChange={(v) => updateClientField("phone", v)}
-            placeholder="Téléphone"
-          />
-          <FieldInput
-            icon={<Building2 size={14} />}
-            value={client.company || ""}
-            onChange={(v) => updateClientField("company", v)}
-            placeholder="Entreprise"
-          />
-          <FieldInput
-            icon={<MapPin size={14} />}
-            value={client.city || ""}
-            onChange={(v) => updateClientField("city", v)}
-            placeholder="Ville"
-          />
-          <FieldInput
-            icon={<CalendarDays size={14} />}
-            value={client.birthday || ""}
-            onChange={(v) => updateClientField("birthday", v)}
-            placeholder="Date anniversaire"
-            type="date"
-          />
-          <FieldInput
-            icon={<Euro size={14} />}
-            value={client.potential_amount?.toString() || ""}
-            onChange={(v) => updateClientField("potential_amount", v)}
-            placeholder="Potentiel commercial"
-            type="number"
-          />
+          <FieldInput icon={<User size={14} />} value={client.first_name || ""} onChange={(v) => updateClientField("first_name", v)} placeholder="Prénom" />
+          <FieldInput icon={<User size={14} />} value={client.last_name || ""} onChange={(v) => updateClientField("last_name", v)} placeholder="Nom" />
+          <FieldInput icon={<Mail size={14} />} value={client.email || ""} onChange={(v) => updateClientField("email", v)} placeholder="Email" />
+          <FieldInput icon={<Phone size={14} />} value={client.phone || ""} onChange={(v) => updateClientField("phone", v)} placeholder="Téléphone" />
+          <FieldInput icon={<Building2 size={14} />} value={client.company || ""} onChange={(v) => updateClientField("company", v)} placeholder="Entreprise" />
+          <FieldInput icon={<MapPin size={14} />} value={client.city || ""} onChange={(v) => updateClientField("city", v)} placeholder="Ville" />
+          <FieldInput icon={<CalendarDays size={14} />} value={client.birthday || ""} onChange={(v) => updateClientField("birthday", v)} placeholder="Moment relationnel" type="date" />
+          <FieldInput icon={<Euro size={14} />} value={client.potential_amount?.toString() || ""} onChange={(v) => updateClientField("potential_amount", v)} placeholder="Potentiel commercial" type="number" />
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-              Statut
+              Statut relationnel
             </label>
             <select
               value={client.status || ""}
@@ -909,8 +899,8 @@ export default function ClientDetail({
               <option value="">Non défini</option>
               <option value="prospect">Prospect</option>
               <option value="client">Client</option>
-              <option value="chaud">Chaud</option>
-              <option value="a_relancer">À relancer</option>
+              <option value="chaud">Signal chaud</option>
+              <option value="a_relancer">Action requise</option>
             </select>
           </div>
 
@@ -918,20 +908,20 @@ export default function ClientDetail({
             icon={<Inbox size={14} />}
             value={client.group_name || ""}
             onChange={(v) => updateClientField("group_name", v)}
-            placeholder="Groupe"
+            placeholder="Réseau / groupe"
           />
         </div>
 
         <div className="mt-4">
           <label className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-            Notes internes client
+            Renseignements internes
           </label>
           <textarea
             value={client.notes || ""}
             onChange={(e) => updateClientField("notes", e.target.value)}
             rows={4}
             className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-            placeholder="Notes générales sur ce client..."
+            placeholder="Informations importantes, contexte, besoins, objections, habitudes relationnelles..."
           />
         </div>
       </section>
@@ -939,72 +929,57 @@ export default function ClientDetail({
       <div className="grid gap-6 xl:grid-cols-2">
         <ActionPanel
           icon={<StickyNote size={18} />}
-          title="Ajouter une note"
-          description="Ajoute un échange, une information ou un commentaire dans la timeline."
+          title="Ajouter un renseignement"
+          description="Ajoute une information utile dans la chronologie relationnelle."
         >
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={4}
             className="mt-4 w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium outline-none focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-            placeholder="Écris ta note ici..."
+            placeholder="Ajoute un renseignement, un échange, une précision ou un signal faible..."
           />
           <button
             onClick={addNote}
-            className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-200"
+            className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5"
           >
             <Plus size={16} />
-            Ajouter la note
+            Ajouter au dossier
           </button>
         </ActionPanel>
 
         <ActionPanel
           icon={<Bell size={18} />}
-          title="Créer une relance"
-          description="Programme une relance rapide ou personnalisée pour ce client."
+          title="Programmer une action"
+          description="Crée une action prioritaire pour ne pas laisser la relation refroidir."
         >
           <div className="mt-4 space-y-3">
             <button
               onClick={createQuickFollowUp}
-              className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-300"
+              className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-300 transition hover:-translate-y-0.5"
             >
               <CalendarDays size={16} />
-              Relance demain
+              Action demain
             </button>
 
-            <FieldInput
-              icon={<CalendarDays size={14} />}
-              value={followUpDate}
-              onChange={setFollowUpDate}
-              placeholder="Date de relance"
-              type="datetime-local"
-            />
-            <FieldInput
-              icon={<Bell size={14} />}
-              value={followUpTitle}
-              onChange={setFollowUpTitle}
-              placeholder="Titre de relance"
-            />
+            <FieldInput icon={<CalendarDays size={14} />} value={followUpDate} onChange={setFollowUpDate} placeholder="Date d’action" type="datetime-local" />
+            <FieldInput icon={<Bell size={14} />} value={followUpTitle} onChange={setFollowUpTitle} placeholder="Titre de l’action" />
 
             <textarea
               value={followUpNote}
               onChange={(e) => setFollowUpNote(e.target.value)}
               rows={3}
               className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium outline-none focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-              placeholder="Note de relance..."
+              placeholder="Contexte de l’action..."
             />
 
             <button
               onClick={createCustomFollowUp}
               disabled={savingFollowUp}
-              className="inline-flex items-center gap-2 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 disabled:opacity-60"
             >
-              {savingFollowUp ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Plus size={16} />
-              )}
-              Créer la relance
+              {savingFollowUp ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+              Créer l’action
             </button>
           </div>
         </ActionPanel>
@@ -1012,65 +987,52 @@ export default function ClientDetail({
 
       <ActionPanel
         icon={<Bot size={18} />}
-        title="Radar IA"
-        description="Analyse le client et trouve un angle de conversation utile."
+        title="PX Sentinel"
+        description="Analyse le dossier, détecte les signaux et prépare l’approche la plus pertinente."
+        dark
       >
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <button
             onClick={enrichClientWithAI}
             disabled={enrichingAI}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-cyan-200 disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-cyan-950/30 transition hover:-translate-y-0.5 disabled:opacity-60"
           >
-            {enrichingAI ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Sparkles size={16} />
-            )}
-            Enrichir avec IA
+            {enrichingAI ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            Lancer l’analyse Sentinel
           </button>
 
           <button
             onClick={findConversationOpportunity}
             disabled={findingOpportunity}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-300 disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 disabled:opacity-60"
           >
-            {findingOpportunity ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Lightbulb size={16} />
-            )}
-            Trouver une opportunité
+            {findingOpportunity ? <Loader2 size={16} className="animate-spin" /> : <Lightbulb size={16} />}
+            Détecter une approche
           </button>
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <InfoCard title="Résumé IA">
-            {client.ai_summary ||
-              "Aucune analyse IA disponible pour le moment."}
+          <InfoCard title="Analyse Sentinel">
+            {client.ai_summary || "Aucune analyse Sentinel disponible pour ce dossier."}
           </InfoCard>
-          <InfoCard title="Prochaine action">
-            {client.next_best_action ||
-              "Aucune action recommandée pour le moment."}
+          <InfoCard title="Action recommandée">
+            {client.next_best_action || "Aucune action prioritaire détectée pour le moment."}
           </InfoCard>
         </div>
 
         {conversationOpportunity && (
-          <div className="mt-4 rounded-3xl border border-cyan-100 bg-cyan-50 p-4">
-            <p className="text-sm font-black text-slate-950">
-              {conversationOpportunity.angle}
-            </p>
-            <p className="mt-2 text-sm text-slate-600">
-              {conversationOpportunity.reason}
-            </p>
+          <div className="mt-4 rounded-3xl border border-cyan-300/30 bg-cyan-400/10 p-4">
+            <p className="text-sm font-black text-white">{conversationOpportunity.angle}</p>
+            <p className="mt-2 text-sm text-slate-300">{conversationOpportunity.reason}</p>
             <div className="mt-3 rounded-2xl bg-white p-4 text-sm leading-6 text-slate-700">
               {conversationOpportunity.message}
             </div>
             <button
               onClick={() => setEmailContent(conversationOpportunity.message)}
-              className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-cyan-700 px-4 py-3 text-xs font-black text-white"
+              className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-cyan-500 px-4 py-3 text-xs font-black text-white"
             >
               <Copy size={14} />
-              Utiliser ce message
+              Utiliser cette approche
             </button>
           </div>
         )}
@@ -1078,50 +1040,41 @@ export default function ClientDetail({
 
       <ActionPanel
         icon={<Send size={18} />}
-        title="Envoyer un email"
-        description="Envoie un email manuel avec la signature automatique MyPX."
+        title="Déployer une approche"
+        description="Envoie une transmission personnalisée avec ta signature automatique MyPX."
       >
         <div className="mt-4 space-y-3">
-          <FieldInput
-            icon={<Mail size={14} />}
-            value={emailSubject}
-            onChange={setEmailSubject}
-            placeholder="Sujet de l’email"
-          />
+          <FieldInput icon={<Mail size={14} />} value={emailSubject} onChange={setEmailSubject} placeholder="Sujet de la transmission" />
 
           <textarea
             value={emailContent}
             onChange={(e) => setEmailContent(e.target.value)}
             rows={7}
             className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium outline-none focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-            placeholder="Message à envoyer..."
+            placeholder="Message à transmettre..."
           />
 
           <button
             onClick={sendManualEmail}
             disabled={sendingEmail}
-            className="inline-flex items-center gap-2 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 disabled:opacity-60"
           >
-            {sendingEmail ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Send size={16} />
-            )}
-            Envoyer l’email
+            {sendingEmail ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            Envoyer la transmission
           </button>
         </div>
       </ActionPanel>
 
-      <section className="rounded-[2rem] border border-white/75 bg-white/70 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:p-6">
+      <section className="rounded-[2rem] border border-white/75 bg-white/80 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:p-6">
         <div className="flex items-center gap-2">
           <Mail size={18} className="text-violet-700" />
-          <h3 className="text-lg font-black text-slate-950">Timeline client</h3>
+          <h3 className="text-lg font-black text-slate-950">Chronologie relationnelle</h3>
         </div>
 
         <div className="mt-5 max-h-[520px] space-y-3 overflow-y-auto pr-1">
           {timeline.length === 0 ? (
             <div className="rounded-3xl border border-slate-100 bg-slate-50 p-4 text-sm font-bold text-slate-500">
-              Aucun historique pour ce client.
+              Aucun signal enregistré pour ce dossier.
             </div>
           ) : (
             timeline.map((item) => {
@@ -1131,7 +1084,7 @@ export default function ClientDetail({
               return (
                 <div
                   key={`${item.type}-${item.id}`}
-                  className={`rounded-3xl border p-4 shadow-sm ${
+                  className={`rounded-3xl border p-4 shadow-sm transition hover:-translate-y-0.5 ${
                     isReceived
                       ? "border-emerald-100 bg-emerald-50"
                       : "border-slate-100 bg-white"
@@ -1156,10 +1109,10 @@ export default function ClientDetail({
                           {item.type === "note" && <StickyNote size={12} />}
                           {item.type === "follow_up" && <Bell size={12} />}
 
-                          {item.type === "email" && "Email envoyé"}
-                          {item.type === "email_received" && "Email reçu"}
-                          {item.type === "note" && "Note"}
-                          {item.type === "follow_up" && "Relance"}
+                          {item.type === "email" && "Transmission envoyée"}
+                          {item.type === "email_received" && "Transmission reçue"}
+                          {item.type === "note" && "Renseignement"}
+                          {item.type === "follow_up" && "Action"}
                         </span>
 
                         {isUnread && (
@@ -1169,13 +1122,11 @@ export default function ClientDetail({
                         )}
                       </div>
 
-                      <p className="mt-3 text-sm font-black text-slate-950">
-                        {item.title}
-                      </p>
+                      <p className="mt-3 text-sm font-black text-slate-950">{item.title}</p>
 
                       {isReceived && (
                         <p className="mt-1 text-xs font-bold text-emerald-700">
-                          De : {item.from_name || item.from_email || "Client"}
+                          Source : {item.from_name || item.from_email || "Client"}
                         </p>
                       )}
 
@@ -1189,7 +1140,7 @@ export default function ClientDetail({
                           className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-xs font-black text-white shadow-lg shadow-slate-300"
                         >
                           <MailOpen size={14} />
-                          Marquer comme lu
+                          Marquer comme traité
                         </button>
                       )}
                     </div>
@@ -1208,9 +1159,6 @@ export default function ClientDetail({
   );
 }
 
-/* GARDE TES COMPOSANTS EXISTANTS EN DESSOUS :
-ScoreCard, FieldInput, SectionHeader, InfoCard, ActionPanel
-*/
 function ScoreCard({
   icon,
   label,
@@ -1225,18 +1173,18 @@ function ScoreCard({
   tone: "emerald" | "cyan";
 }) {
   const classes = {
-    emerald: "bg-emerald-50 text-emerald-700",
-    cyan: "bg-cyan-50 text-cyan-700",
+    emerald: "border-emerald-400/20 bg-emerald-400/10 text-emerald-200",
+    cyan: "border-cyan-400/20 bg-cyan-400/10 text-cyan-200",
   };
 
   return (
-    <div className={`rounded-3xl px-5 py-4 ${classes[tone]}`}>
+    <div className={`rounded-3xl border px-5 py-4 ${classes[tone]}`}>
       <div className="flex items-center gap-2">
         {icon}
         <span className="text-sm font-black">{label}</span>
       </div>
-      <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
-      <p className="mt-1 text-xs font-bold opacity-70">{sub}</p>
+      <p className="mt-2 text-3xl font-black text-white">{value}</p>
+      <p className="mt-1 text-xs font-bold opacity-80">{sub}</p>
     </div>
   );
 }
@@ -1278,22 +1226,32 @@ function SectionHeader({
   title,
   description,
   action,
+  dark = false,
 }: {
   icon: React.ReactNode;
   eyebrow: string;
   title: string;
   description: string;
   action: React.ReactNode;
+  dark?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
       <div>
-        <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-slate-500">
+        <p
+          className={`flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] ${
+            dark ? "text-violet-200" : "text-slate-500"
+          }`}
+        >
           {icon}
           {eyebrow}
         </p>
-        <h3 className="mt-2 text-xl font-black text-slate-950">{title}</h3>
-        <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
+        <h3 className={`mt-2 text-2xl font-black ${dark ? "text-white" : "text-slate-950"}`}>
+          {title}
+        </h3>
+        <p className={`mt-2 text-sm leading-6 ${dark ? "text-slate-300" : "text-slate-500"}`}>
+          {description}
+        </p>
       </div>
 
       {action}
@@ -1309,11 +1267,11 @@ function InfoCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-3xl border border-slate-100 bg-white/90 p-4 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+    <div className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-[0.16em] text-cyan-200">
         {title}
       </p>
-      <div className="mt-3 whitespace-pre-line text-sm font-medium leading-6 text-slate-600">
+      <div className="mt-3 whitespace-pre-line text-sm font-medium leading-6 text-slate-200">
         {children}
       </div>
     </div>
@@ -1325,14 +1283,32 @@ function ActionPanel({
   title,
   description,
   children,
+  dark = false,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   children: React.ReactNode;
+  dark?: boolean;
 }) {
+  if (dark) {
+    return (
+      <div className="relative overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-950 p-5 text-white shadow-2xl shadow-violet-950/30 sm:p-6">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.30),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(6,182,212,0.20),transparent_34%)]" />
+        <div className="relative">
+          <div className="flex items-center gap-2">
+            <span className="text-cyan-300">{icon}</span>
+            <h3 className="text-lg font-black text-white">{title}</h3>
+          </div>
+          <p className="mt-2 text-sm font-medium text-slate-300">{description}</p>
+          {children}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-[2rem] border border-white/75 bg-white/70 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:p-6">
+    <div className="rounded-[2rem] border border-white/75 bg-white/80 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:p-6">
       <div className="flex items-center gap-2">
         <span className="text-violet-700">{icon}</span>
         <h3 className="text-lg font-black text-slate-950">{title}</h3>
