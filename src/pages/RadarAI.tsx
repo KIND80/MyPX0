@@ -56,9 +56,9 @@ type EnrichResult = {
   suggested_message?: string;
   last_ai_update?: string;
   sources?: SourceItem[];
-  monthly_limit?: number;
-  monthly_used?: number;
-  monthly_remaining?: number;
+  daily_limit?: number;
+  daily_used?: number;
+  daily_remaining?: number;
 };
 
 type AIHistoryRow = {
@@ -73,7 +73,7 @@ type AIHistoryRow = {
   created_at: string;
 };
 
-const MONTHLY_AI_LIMIT = 3;
+const DAILY_AI_LIMIT = 10;
 
 function getClientName(client: ClientRow) {
   return (
@@ -107,27 +107,26 @@ export default function RadarAI({ session }: RadarAIProps) {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const [monthlyUsed, setMonthlyUsed] = useState(0);
-  const [monthlyRemaining, setMonthlyRemaining] = useState(MONTHLY_AI_LIMIT);
+  const [dailyUsed, setDailyUsed] = useState(0);
+  const [dailyRemaining, setDailyRemaining] = useState(DAILY_AI_LIMIT);
   const [loadingUsage, setLoadingUsage] = useState(true);
 
   const fetchUsage = async () => {
     setLoadingUsage(true);
 
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
 
     const { count, error } = await supabase
       .from("client_ai_history")
       .select("*", { count: "exact", head: true })
       .eq("user_id", session.user.id)
-      .gte("created_at", startOfMonth.toISOString());
+      .gte("created_at", startOfDay.toISOString());
 
     if (!error) {
       const used = count || 0;
-      setMonthlyUsed(used);
-      setMonthlyRemaining(Math.max(0, MONTHLY_AI_LIMIT - used));
+      setDailyUsed(used);
+      setDailyRemaining(Math.max(0, DAILY_AI_LIMIT - used));
     }
 
     setLoadingUsage(false);
@@ -270,7 +269,7 @@ export default function RadarAI({ session }: RadarAIProps) {
     selectedClient?.last_ai_update ||
     null;
 
-  const isLimitReached = monthlyRemaining <= 0;
+  const isLimitReached = dailyRemaining <= 0;
 
   const handleSelectClient = async (client: ClientRow) => {
     setSelectedClientId(client.id);
@@ -297,7 +296,7 @@ export default function RadarAI({ session }: RadarAIProps) {
 
     if (isLimitReached) {
       setError(
-        "Limite atteinte : vous avez déjà utilisé vos 3 analyses IA ce mois-ci."
+        "Limite atteinte : vous avez déjà utilisé vos 10 analyses IA aujourd’hui."
       );
       return;
     }
@@ -324,14 +323,15 @@ export default function RadarAI({ session }: RadarAIProps) {
     if (error) {
       const errorMessage = error.message || "";
 
-      const isMonthlyLimitError =
+      const isDailyLimitError =
         errorMessage.toLowerCase().includes("limite") ||
-        errorMessage.toLowerCase().includes("monthly") ||
+        errorMessage.toLowerCase().includes("daily") ||
+        errorMessage.toLowerCase().includes("day") ||
         errorMessage.includes("403");
 
       setError(
-        isMonthlyLimitError
-          ? "Limite atteinte : vous avez déjà utilisé vos 3 analyses IA ce mois-ci."
+        isDailyLimitError
+          ? "Limite atteinte : vous avez déjà utilisé vos 10 analyses IA aujourd’hui."
           : errorMessage || "Erreur pendant l’analyse IA."
       );
 
@@ -344,18 +344,19 @@ export default function RadarAI({ session }: RadarAIProps) {
 
     setResult(enrichData);
 
-    if (typeof enrichData.monthly_used === "number") {
-      setMonthlyUsed(enrichData.monthly_used);
+    if (typeof enrichData.daily_used === "number") {
+      setDailyUsed(enrichData.daily_used);
     }
 
-    if (typeof enrichData.monthly_remaining === "number") {
-      setMonthlyRemaining(enrichData.monthly_remaining);
+    if (typeof enrichData.daily_remaining === "number") {
+      setDailyRemaining(enrichData.daily_remaining);
     } else {
       await fetchUsage();
     }
 
     await fetchClients();
     await fetchHistory(selectedClient.id);
+    await fetchUsage();
 
     setAnalyzing(false);
   };
@@ -417,21 +418,21 @@ ${currentAiSummary}
             }`}
           >
             <p className="text-xs font-black uppercase tracking-[0.18em]">
-              Analyses IA ce mois
+              Analyses IA aujourd’hui
             </p>
 
             <p className="mt-2 text-2xl font-black">
-              {loadingUsage ? "..." : `${monthlyRemaining}/${MONTHLY_AI_LIMIT}`}
+              {loadingUsage ? "..." : `${dailyRemaining}/${DAILY_AI_LIMIT}`}
             </p>
 
             <p className="mt-1 text-xs font-bold opacity-70">
               {loadingUsage
                 ? "Calcul en cours..."
                 : isLimitReached
-                ? "Limite mensuelle atteinte"
-                : `${monthlyUsed} analyse${
-                    monthlyUsed > 1 ? "s" : ""
-                  } utilisée${monthlyUsed > 1 ? "s" : ""}`}
+                ? "Limite journalière atteinte"
+                : `${dailyUsed} analyse${dailyUsed > 1 ? "s" : ""} utilisée${
+                    dailyUsed > 1 ? "s" : ""
+                  } aujourd’hui`}
             </p>
           </div>
 
@@ -609,14 +610,14 @@ ${currentAiSummary}
                     {analyzing
                       ? "Recherche en cours..."
                       : isLimitReached
-                      ? "Limite mensuelle atteinte"
+                      ? "Limite journalière atteinte"
                       : "Nouvelle analyse SerpApi"}
                   </button>
 
                   <p className="text-center text-xs font-bold text-slate-400">
-                    {monthlyRemaining} analyse
-                    {monthlyRemaining > 1 ? "s" : ""} restante
-                    {monthlyRemaining > 1 ? "s" : ""} ce mois
+                    {dailyRemaining} analyse
+                    {dailyRemaining > 1 ? "s" : ""} restante
+                    {dailyRemaining > 1 ? "s" : ""} aujourd’hui
                   </p>
                 </div>
               </div>

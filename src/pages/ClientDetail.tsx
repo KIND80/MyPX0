@@ -9,9 +9,11 @@ import {
   CalendarDays,
   Copy,
   Euro,
+  Inbox,
   Lightbulb,
   Loader2,
   Mail,
+  MailOpen,
   MapPin,
   Phone,
   Plus,
@@ -71,10 +73,13 @@ type UserOnboarding = {
 
 type TimelineItem = {
   id: string;
-  type: "email" | "note" | "follow_up";
+  type: "email" | "email_received" | "note" | "follow_up";
   title: string;
   content: string;
   created_at: string;
+  status?: string | null;
+  from_email?: string | null;
+  from_name?: string | null;
 };
 
 type ConversationOpportunity = {
@@ -118,17 +123,19 @@ const sendEmail = async ({
   to,
   subject,
   html,
+  user_id,
   user_name,
   user_email,
 }: {
   to: string;
   subject: string;
   html: string;
+  user_id: string;
   user_name: string;
   user_email: string;
 }) => {
   const { data, error } = await supabase.functions.invoke("send-email", {
-    body: { to, subject, html, user_name, user_email },
+    body: { to, subject, html, user_id, user_name, user_email },
   });
 
   if (error) {
@@ -282,6 +289,7 @@ export default function ClientDetail({
   const [followUpTitle, setFollowUpTitle] = useState("");
   const [followUpNote, setFollowUpNote] = useState("");
   const [savingFollowUp, setSavingFollowUp] = useState(false);
+
   const fetchClientDetail = async () => {
     setLoading(true);
 
@@ -313,31 +321,52 @@ export default function ClientDetail({
       score: calculateScore(clientData as Client),
     };
 
-    const { data: emailLogs } = await supabase
-      .from("email_logs")
-      .select("*")
-      .eq("client_id", clientId)
-      .eq("user_id", session.user.id);
+    const [{ data: emailLogs }, { data: inboundEmails }, { data: notes }, { data: followUps }] =
+      await Promise.all([
+        supabase
+          .from("email_logs")
+          .select("*")
+          .eq("client_id", clientId)
+          .eq("user_id", session.user.id),
 
-    const { data: notes } = await supabase
-      .from("client_notes")
-      .select("*")
-      .eq("client_id", clientId)
-      .eq("user_id", session.user.id);
+        supabase
+          .from("inbound_emails")
+          .select("*")
+          .eq("client_id", clientId)
+          .eq("user_id", session.user.id),
 
-    const { data: followUps } = await supabase
-      .from("follow_ups")
-      .select("*")
-      .eq("client_id", clientId)
-      .eq("user_id", session.user.id);
+        supabase
+          .from("client_notes")
+          .select("*")
+          .eq("client_id", clientId)
+          .eq("user_id", session.user.id),
+
+        supabase
+          .from("follow_ups")
+          .select("*")
+          .eq("client_id", clientId)
+          .eq("user_id", session.user.id),
+      ]);
 
     const emailItems: TimelineItem[] =
       emailLogs?.map((item) => ({
         id: item.id,
         type: "email",
-        title: item.subject || "Email",
+        title: item.subject || "Email envoyé",
         content: item.content || "",
         created_at: item.created_at,
+      })) || [];
+
+    const inboundItems: TimelineItem[] =
+      inboundEmails?.map((item) => ({
+        id: item.id,
+        type: "email_received",
+        title: item.subject || "Email reçu",
+        content: item.text_content || item.html_content || "",
+        created_at: item.created_at,
+        status: item.status,
+        from_email: item.from_email,
+        from_name: item.from_name,
       })) || [];
 
     const noteItems: TimelineItem[] =
@@ -361,7 +390,7 @@ export default function ClientDetail({
     setClient(enrichedClient);
 
     setTimeline(
-      [...emailItems, ...noteItems, ...followUpItems].sort(
+      [...emailItems, ...inboundItems, ...noteItems, ...followUpItems].sort(
         (a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )
@@ -373,6 +402,27 @@ export default function ClientDetail({
   useEffect(() => {
     fetchClientDetail();
   }, [clientId]);
+
+  const markInboundEmailAsRead = async (emailId: string) => {
+    const { error } = await supabase
+      .from("inbound_emails")
+      .update({ status: "read" })
+      .eq("id", emailId)
+      .eq("user_id", session.user.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setTimeline((prev) =>
+      prev.map((item) =>
+        item.id === emailId && item.type === "email_received"
+          ? { ...item, status: "read" }
+          : item
+      )
+    );
+  };
 
   const updateClientField = (field: keyof Client, value: string) => {
     if (!client) return;
@@ -483,6 +533,7 @@ export default function ClientDetail({
 
     fetchClientDetail();
   };
+
   const createCustomFollowUp = async () => {
     if (!followUpDate) {
       alert("Choisis une date de relance.");
@@ -525,6 +576,7 @@ export default function ClientDetail({
 
     fetchClientDetail();
   };
+
   const enrichClientWithAI = async () => {
     if (!client) return;
 
@@ -668,7 +720,7 @@ export default function ClientDetail({
     const signatureHtml = buildEmailSignature(onboarding);
     const html = `
       <div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.7;color:#111827;">
-      ${escapeHtml(emailContent).replace(/\n/g, "<br />")}
+        ${escapeHtml(emailContent).replace(/\n/g, "<br />")}
         ${signatureHtml}
       </div>
     `;
@@ -686,6 +738,7 @@ export default function ClientDetail({
       to: client.email,
       subject: emailSubject,
       html,
+      user_id: session.user.id,
       user_name: userName,
       user_email: userEmail,
     });
@@ -747,365 +800,7 @@ export default function ClientDetail({
         Retour clients
       </button>
 
-      <section className="rounded-[2rem] border border-white/75 bg-white/70 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-violet-700">
-              <User size={14} />
-              Fiche client pro
-            </div>
-
-            <h2 className="mt-4 text-4xl font-black tracking-tight text-slate-950">
-              {fullName}
-            </h2>
-
-            <p className="mt-2 text-sm font-medium text-slate-500">
-              Dernier contact :{" "}
-              {client.last_contact_at
-                ? new Date(client.last_contact_at).toLocaleDateString("fr-FR")
-                : "Aucun"}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <ScoreCard
-              icon={<Sparkles size={18} />}
-              label="Score CRM"
-              value={client.score ?? 0}
-              tone="emerald"
-              sub="Potentiel relationnel"
-            />
-
-            <ScoreCard
-              icon={<Bot size={18} />}
-              label="Score IA"
-              value={client.ai_score ?? 0}
-              tone="cyan"
-              sub={
-                client.public_enrichment_status === "processing"
-                  ? "Analyse en cours..."
-                  : client.ai_status || "Non analysé"
-              }
-            />
-          </div>
-        </div>
-
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <FieldInput
-            icon={<User size={15} />}
-            value={client.first_name || ""}
-            onChange={(value) => updateClientField("first_name", value)}
-            placeholder="Prénom"
-          />
-          <FieldInput
-            icon={<User size={15} />}
-            value={client.last_name || ""}
-            onChange={(value) => updateClientField("last_name", value)}
-            placeholder="Nom"
-          />
-          <FieldInput
-            icon={<Mail size={15} />}
-            value={client.email || ""}
-            onChange={(value) => updateClientField("email", value)}
-            placeholder="Email"
-          />
-          <FieldInput
-            icon={<Phone size={15} />}
-            value={client.phone || ""}
-            onChange={(value) => updateClientField("phone", value)}
-            placeholder="Téléphone"
-          />
-          <FieldInput
-            icon={<Building2 size={15} />}
-            value={client.company || ""}
-            onChange={(value) => updateClientField("company", value)}
-            placeholder="Société"
-          />
-          <FieldInput
-            icon={<MapPin size={15} />}
-            value={client.city || ""}
-            onChange={(value) => updateClientField("city", value)}
-            placeholder="Ville"
-          />
-          <FieldInput
-            icon={<CalendarDays size={15} />}
-            type="date"
-            value={client.birthday || ""}
-            onChange={(value) => updateClientField("birthday", value)}
-            placeholder="Anniversaire"
-          />
-          <FieldInput
-            icon={<Sparkles size={15} />}
-            value={client.group_name || ""}
-            onChange={(value) => updateClientField("group_name", value)}
-            placeholder="Groupe"
-          />
-
-          <select
-            value={client.status || "prospect"}
-            onChange={(e) => updateClientField("status", e.target.value)}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-          >
-            <option value="prospect">Prospect</option>
-            <option value="client">Client</option>
-            <option value="chaud">Chaud</option>
-            <option value="a_relancer">À relancer</option>
-          </select>
-
-          <FieldInput
-            icon={<Euro size={15} />}
-            type="number"
-            value={
-              client.potential_amount ? String(client.potential_amount) : ""
-            }
-            onChange={(value) => updateClientField("potential_amount", value)}
-            placeholder="Potentiel €"
-          />
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-3">
-          <button
-            onClick={saveClient}
-            disabled={savingClient}
-            className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300 transition hover:-translate-y-0.5 hover:bg-black disabled:opacity-60"
-          >
-            {savingClient ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Save size={16} />
-            )}
-            {savingClient ? "Enregistrement..." : "Enregistrer modifications"}
-          </button>
-
-          <button
-            onClick={createQuickFollowUp}
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:text-slate-950"
-          >
-            <Bell size={16} />
-            Relance J+1
-          </button>
-        </div>
-        <div className="mt-5 rounded-[1.7rem] border border-violet-100 bg-violet-50/70 p-4">
-          <div className="flex items-center gap-2">
-            <CalendarDays size={18} className="text-violet-700" />
-            <h3 className="text-sm font-black text-slate-950">
-              Planifier une relance personnalisée
-            </h3>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <input
-              type="date"
-              value={followUpDate}
-              onChange={(e) => setFollowUpDate(e.target.value)}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-            />
-
-            <input
-              type="text"
-              value={followUpTitle}
-              onChange={(e) => setFollowUpTitle(e.target.value)}
-              placeholder="Titre : Appeler, envoyer devis, vérifier dossier..."
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none placeholder:text-slate-300 focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-            />
-
-            <textarea
-              value={followUpNote}
-              onChange={(e) => setFollowUpNote(e.target.value)}
-              placeholder="Note / contexte de la relance..."
-              className="min-h-[100px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300 focus:border-violet-300 focus:ring-4 focus:ring-violet-100 md:col-span-2"
-            />
-          </div>
-
-          <button
-            onClick={createCustomFollowUp}
-            disabled={savingFollowUp}
-            className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300 disabled:opacity-60"
-          >
-            {savingFollowUp ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Bell size={16} />
-            )}
-            {savingFollowUp ? "Ajout..." : "Ajouter la relance"}
-          </button>
-        </div>
-      </section>
-
-      <section className="rounded-[2rem] border border-amber-100 bg-amber-50/80 p-5 shadow-xl shadow-amber-100/50 backdrop-blur-2xl sm:p-6">
-        <SectionHeader
-          icon={<Lightbulb size={18} />}
-          eyebrow="Créateur d’opportunités"
-          title="Trouver une opportunité de conversation"
-          description="MyPX propose un angle intelligent pour reprendre contact sans approche commerciale forcée."
-          action={
-            <button
-              onClick={findConversationOpportunity}
-              disabled={findingOpportunity}
-              className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300 disabled:opacity-60"
-            >
-              {findingOpportunity ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Lightbulb size={16} />
-              )}
-              {findingOpportunity ? "Recherche..." : "Trouver une opportunité"}
-            </button>
-          }
-        />
-
-        {conversationOpportunity ? (
-          <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <InfoCard title="Angle proposé">
-              {conversationOpportunity.angle}
-            </InfoCard>
-
-            <InfoCard title="Pourquoi maintenant ?">
-              {conversationOpportunity.reason}
-            </InfoCard>
-
-            <InfoCard title="Message prêt à utiliser">
-              {conversationOpportunity.message}
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  onClick={() => {
-                    setEmailSubject("Petite opportunité à échanger ensemble");
-                    setEmailContent(conversationOpportunity.message);
-                  }}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600"
-                >
-                  <Mail size={15} />
-                  Utiliser en email
-                </button>
-
-                <button
-                  onClick={() =>
-                    navigator.clipboard.writeText(
-                      conversationOpportunity.message
-                    )
-                  }
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600"
-                >
-                  <Copy size={15} />
-                  Copier
-                </button>
-              </div>
-            </InfoCard>
-          </div>
-        ) : (
-          <div className="mt-5 rounded-3xl border border-amber-100 bg-white/80 p-4 text-sm font-bold text-slate-500">
-            Clique sur le bouton pour générer une opportunité de conversation.
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-[2rem] border border-cyan-100 bg-cyan-50/80 p-5 shadow-xl shadow-cyan-100/50 backdrop-blur-2xl sm:p-6">
-        <SectionHeader
-          icon={<Bot size={18} />}
-          eyebrow="Agent IA MyPX"
-          title="Analyse intelligente du contact"
-          description="Résumé, opportunité et prochaine action recommandée."
-          action={
-            <button
-              onClick={enrichClientWithAI}
-              disabled={enrichingAI}
-              className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300 disabled:opacity-60"
-            >
-              {enrichingAI ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Sparkles size={16} />
-              )}
-              {enrichingAI ? "Analyse IA..." : "Relancer analyse IA"}
-            </button>
-          }
-        />
-
-        <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <InfoCard title="Résumé IA">
-            {client.ai_summary || "Aucune analyse IA pour le moment."}
-          </InfoCard>
-
-          <InfoCard title="Prochaine action">
-            {client.next_best_action ||
-              "Aucune action recommandée pour le moment."}
-          </InfoCard>
-
-          <InfoCard title="Message suggéré">
-            {client.suggested_message ||
-              "Aucun message suggéré pour le moment."}
-
-            {client.suggested_message && (
-              <button
-                onClick={() => {
-                  setEmailSubject("Suite à notre échange");
-                  setEmailContent(client.suggested_message || "");
-                }}
-                className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600"
-              >
-                Utiliser ce message
-              </button>
-            )}
-          </InfoCard>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <ActionPanel
-          icon={<StickyNote size={18} />}
-          title="Ajouter une note"
-          description="Capture rapidement une information utile."
-        >
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Ex: Client intéressé par une optimisation fiscale..."
-            className="mt-4 min-h-[130px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300 transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-          />
-
-          <button
-            onClick={addNote}
-            className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300"
-          >
-            <Plus size={16} />
-            Ajouter note
-          </button>
-        </ActionPanel>
-
-        <ActionPanel
-          icon={<Send size={18} />}
-          title="Envoyer un email manuel"
-          description="La signature conseiller est ajoutée automatiquement."
-        >
-          <input
-            value={emailSubject}
-            onChange={(e) => setEmailSubject(e.target.value)}
-            placeholder="Sujet de l’email"
-            className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300 transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-          />
-
-          <textarea
-            value={emailContent}
-            onChange={(e) => setEmailContent(e.target.value)}
-            placeholder="Message..."
-            className="mt-4 min-h-[130px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300 transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
-          />
-
-          <button
-            onClick={sendManualEmail}
-            disabled={sendingEmail}
-            className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300 disabled:opacity-60"
-          >
-            {sendingEmail ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Mail size={16} />
-            )}
-            {sendingEmail ? "Envoi..." : "Envoyer email"}
-          </button>
-        </ActionPanel>
-      </section>
+      {/* GARDE TOUT TON JSX EXISTANT ICI JUSQU’À LA TIMELINE */}
 
       <section className="rounded-[2rem] border border-white/75 bg-white/70 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:p-6">
         <div className="flex items-center gap-2">
@@ -1119,29 +814,83 @@ export default function ClientDetail({
               Aucun historique pour ce client.
             </div>
           ) : (
-            timeline.map((item) => (
-              <div
-                key={`${item.type}-${item.id}`}
-                className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-black text-slate-950">
-                      {item.type === "email" && "Email"}
-                      {item.type === "note" && "Note"}
-                      {item.type === "follow_up" && "Relance"} — {item.title}
-                    </p>
-                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-500">
-                      {item.content || "—"}
+            timeline.map((item) => {
+              const isReceived = item.type === "email_received";
+              const isUnread = isReceived && item.status !== "read";
+
+              return (
+                <div
+                  key={`${item.type}-${item.id}`}
+                  className={`rounded-3xl border p-4 shadow-sm ${
+                    isReceived
+                      ? "border-emerald-100 bg-emerald-50"
+                      : "border-slate-100 bg-white"
+                  }`}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${
+                            isReceived
+                              ? "bg-emerald-100 text-emerald-800"
+                              : item.type === "email"
+                              ? "bg-blue-50 text-blue-700"
+                              : item.type === "note"
+                              ? "bg-violet-50 text-violet-700"
+                              : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {isReceived && <Inbox size={12} />}
+                          {item.type === "email" && <Mail size={12} />}
+                          {item.type === "note" && <StickyNote size={12} />}
+                          {item.type === "follow_up" && <Bell size={12} />}
+
+                          {item.type === "email" && "Email envoyé"}
+                          {item.type === "email_received" && "Email reçu"}
+                          {item.type === "note" && "Note"}
+                          {item.type === "follow_up" && "Relance"}
+                        </span>
+
+                        {isUnread && (
+                          <span className="rounded-full bg-rose-500 px-2 py-1 text-[10px] font-black uppercase text-white">
+                            Non lu
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="mt-3 text-sm font-black text-slate-950">
+                        {item.title}
+                      </p>
+
+                      {isReceived && (
+                        <p className="mt-1 text-xs font-bold text-emerald-700">
+                          De : {item.from_name || item.from_email || "Client"}
+                        </p>
+                      )}
+
+                      <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
+                        {item.content || "—"}
+                      </p>
+
+                      {isUnread && (
+                        <button
+                          onClick={() => markInboundEmailAsRead(item.id)}
+                          className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-xs font-black text-white shadow-lg shadow-slate-300"
+                        >
+                          <MailOpen size={14} />
+                          Marquer comme lu
+                        </button>
+                      )}
+                    </div>
+
+                    <p className="shrink-0 text-xs font-bold text-slate-400">
+                      {new Date(item.created_at).toLocaleString("fr-FR")}
                     </p>
                   </div>
-
-                  <p className="shrink-0 text-xs font-bold text-slate-400">
-                    {new Date(item.created_at).toLocaleDateString("fr-FR")}
-                  </p>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </section>
@@ -1149,6 +898,9 @@ export default function ClientDetail({
   );
 }
 
+/* GARDE TES COMPOSANTS EXISTANTS EN DESSOUS :
+ScoreCard, FieldInput, SectionHeader, InfoCard, ActionPanel
+*/
 function ScoreCard({
   icon,
   label,

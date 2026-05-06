@@ -1,10 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-} from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Session } from "@supabase/supabase-js";
 import { Brain, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { supabase } from "./lib/supabase";
@@ -15,6 +10,10 @@ import LandingPage from "./pages/LandingPage";
 import OnboardingFlow from "./pages/OnboardingFlow";
 
 const LAST_PRIVATE_PATH_KEY = "mypx_last_private_path";
+const ONBOARDING_CACHE_PREFIX = "mypx_onboarding_completed_";
+
+const getOnboardingCacheKey = (userId: string) =>
+  `${ONBOARDING_CACHE_PREFIX}${userId}`;
 
 export default function App() {
   const location = useLocation();
@@ -33,13 +32,42 @@ export default function App() {
     }
   }, [location.pathname, location.search, location.hash, session]);
 
+  useEffect(() => {
+    const handleOnboardingCompleted = () => {
+      if (!session?.user.id) return;
+
+      localStorage.setItem(getOnboardingCacheKey(session.user.id), "true");
+      setOnboardingDone(true);
+      setCheckingOnboarding(false);
+      setLoading(false);
+    };
+
+    window.addEventListener("mypx-onboarding-completed", handleOnboardingCompleted);
+
+    return () => {
+      window.removeEventListener(
+        "mypx-onboarding-completed",
+        handleOnboardingCompleted
+      );
+    };
+  }, [session]);
+
   const getLastPrivatePath = () => {
-    return localStorage.getItem(LAST_PRIVATE_PATH_KEY) || "/dashboard";
+    return localStorage.getItem(LAST_PRIVATE_PATH_KEY) || "/dashboard?view=home";
   };
 
   const checkOnboarding = async (currentSession: Session | null) => {
     if (!currentSession) {
       setOnboardingDone(false);
+      setCheckingOnboarding(false);
+      return;
+    }
+
+    const cacheKey = getOnboardingCacheKey(currentSession.user.id);
+    const cachedOnboarding = localStorage.getItem(cacheKey);
+
+    if (cachedOnboarding === "true") {
+      setOnboardingDone(true);
       setCheckingOnboarding(false);
       return;
     }
@@ -56,6 +84,7 @@ export default function App() {
       if (error) {
         console.error("Erreur onboarding:", error.message);
         setOnboardingDone(false);
+        localStorage.removeItem(cacheKey);
         return;
       }
 
@@ -72,13 +101,23 @@ export default function App() {
         }
 
         setOnboardingDone(false);
+        localStorage.removeItem(cacheKey);
         return;
       }
 
-      setOnboardingDone(data.completed === true);
+      const completed = data.completed === true;
+
+      setOnboardingDone(completed);
+
+      if (completed) {
+        localStorage.setItem(cacheKey, "true");
+      } else {
+        localStorage.removeItem(cacheKey);
+      }
     } catch (err) {
       console.error("Erreur inattendue onboarding:", err);
       setOnboardingDone(false);
+      localStorage.removeItem(cacheKey);
     } finally {
       setCheckingOnboarding(false);
     }
@@ -92,6 +131,10 @@ export default function App() {
         checkOnboarding(currentSession),
         new Promise<void>((resolve) => setTimeout(resolve, 5000)),
       ]);
+
+      if (mounted) {
+        setCheckingOnboarding(false);
+      }
     };
 
     const getSession = async () => {
@@ -130,14 +173,14 @@ export default function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, authSession) => {
       if (!mounted) return;
 
-      setSession(session);
+      setSession(authSession);
 
       try {
-        if (session) {
-          await safeCheckOnboarding(session);
+        if (authSession) {
+          await safeCheckOnboarding(authSession);
         } else {
           setOnboardingDone(false);
         }
@@ -185,11 +228,7 @@ export default function App() {
       <Route
         path="/register"
         element={
-          !session ? (
-            <Register />
-          ) : (
-            <Navigate to={getLastPrivatePath()} replace />
-          )
+          !session ? <Register /> : <Navigate to={getLastPrivatePath()} replace />
         }
       />
 

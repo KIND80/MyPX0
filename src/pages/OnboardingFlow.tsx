@@ -177,8 +177,22 @@ export default function OnboardingFlow({ session }: Props) {
         setError(error.message);
         return;
       }
-
-      window.location.reload();
+      
+      const { error: emailError } = await supabase.rpc("generate_mypx_email", {
+        p_user_id: session.user.id,
+        p_advisor_name:
+          data.advisor_name.trim() ||
+          data.company_name.trim() ||
+          session.user.email ||
+          "user",
+      });
+      
+      if (emailError) {
+        setError(`Profil enregistré, mais erreur email MyPX : ${emailError.message}`);
+        return;
+      }
+      
+      window.location.href = "/dashboard?view=home";
     } catch {
       setError("Une erreur est survenue pendant la configuration.");
     } finally {

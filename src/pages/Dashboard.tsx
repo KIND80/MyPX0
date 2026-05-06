@@ -8,7 +8,7 @@ import FollowUps from "./FollowUps";
 import Clients from "./Clients";
 import RadarAI from "./RadarAI";
 import Settings from "./Settings";
-import { Settings as SettingsIcon } from "lucide-react";
+import Inbox from "./Inbox";
 import {
   Bell,
   Bot,
@@ -16,11 +16,13 @@ import {
   CircleAlert,
   Clock3,
   Flame,
+  Inbox as InboxIcon,
   LayoutDashboard,
   LogOut,
   Mail,
   Megaphone,
   Plus,
+  Settings as SettingsIcon,
   Sparkles,
   Star,
   Users,
@@ -37,10 +39,7 @@ type DashboardProps = {
 type ActiveView =
   | "home"
   | "clients"
-  | "campaigns"
-  | "welcome"
-  | "email_logs"
-  | "follow_ups"
+  | "email_hub"
   | "radar_ai"
   | "settings";
 
@@ -78,24 +77,24 @@ type CampaignRow = {
 
 const onboardingSteps = [
   {
-    title: "Connecte une adresse d’envoi",
+    title: "Connecte ton email MyPX",
     description:
-      "Associe ta première adresse email pour envoyer tes messages de bienvenue, campagnes et relances.",
+      "Ton adresse conseiller reçoit les réponses clients directement dans MyPX.",
   },
   {
-    title: "Crée tes groupes intelligents",
+    title: "Ajoute tes clients",
     description:
-      "Organise ton portefeuille : prospects, clients actifs, premium, réactivation, fiscalité, placements...",
+      "Centralise ton portefeuille avec statut, potentiel, groupe et relances.",
   },
   {
-    title: "Personnalise ton email de bienvenue",
+    title: "Personnalise ton Welcome",
     description:
-      "Prépare un message d’accueil automatique envoyé dès qu’un client est ajouté.",
+      "Prépare un message d’accueil automatique propre et professionnel.",
   },
   {
-    title: "Ajoute ton premier client",
+    title: "Anime ton portefeuille",
     description:
-      "Commence à remplir ton portefeuille et active la logique de suivi et d’animation.",
+      "Relances, anniversaires, campagnes et Radar IA t’aident à rester présent.",
   },
 ];
 
@@ -105,14 +104,41 @@ const navItems: {
   icon: React.ElementType;
 }[] = [
   { view: "home", label: "Dashboard", icon: LayoutDashboard },
+  { view: "email_hub", label: "Email", icon: InboxIcon },
   { view: "radar_ai", label: "Radar IA", icon: Bot },
   { view: "clients", label: "Clients", icon: Users },
-  { view: "campaigns", label: "Campagnes", icon: Megaphone },
-  { view: "welcome", label: "Welcome", icon: Mail },
-  { view: "email_logs", label: "Email Logs", icon: Mail },
-  { view: "follow_ups", label: "Relances", icon: Bell },
   { view: "settings", label: "Paramètres", icon: SettingsIcon },
 ];
+
+function getInitialView(): ActiveView {
+  const params = new URLSearchParams(window.location.search);
+  const view = params.get("view");
+
+  if (
+    view === "inbox" ||
+    view === "campaigns" ||
+    view === "welcome" ||
+    view === "email_logs"
+  ) {
+    return "email_hub";
+  }
+
+  if (view === "follow_ups") {
+    return "clients";
+  }
+
+  const allowedViews: ActiveView[] = [
+    "home",
+    "clients",
+    "email_hub",
+    "radar_ai",
+    "settings",
+  ];
+
+  return view && allowedViews.includes(view as ActiveView)
+    ? (view as ActiveView)
+    : "home";
+}
 
 const calculateScore = (client: ClientRow) => {
   let score = 0;
@@ -147,10 +173,8 @@ const calculateScore = (client: ClientRow) => {
 
 function isBirthdayToday(dateString: string | null) {
   if (!dateString) return false;
-
   const date = new Date(dateString);
   const now = new Date();
-
   return date.getDate() === now.getDate() && date.getMonth() === now.getMonth();
 }
 
@@ -159,7 +183,6 @@ function daysUntilBirthday(dateString: string | null) {
 
   const birthday = new Date(dateString);
   const now = new Date();
-
   const nextBirthday = new Date(
     now.getFullYear(),
     birthday.getMonth(),
@@ -170,27 +193,9 @@ function daysUntilBirthday(dateString: string | null) {
     nextBirthday.setFullYear(now.getFullYear() + 1);
   }
 
-  const diffTime = nextBirthday.getTime() - now.getTime();
-
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-}
-
-function getInitialView(): ActiveView {
-  const params = new URLSearchParams(window.location.search);
-  const view = params.get("view") as ActiveView | null;
-
-  const allowedViews: ActiveView[] = [
-    "home",
-    "clients",
-    "campaigns",
-    "welcome",
-    "email_logs",
-    "follow_ups",
-    "radar_ai",
-    "settings",
-  ];
-
-  return view && allowedViews.includes(view) ? view : "home";
+  return Math.ceil(
+    (nextBirthday.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+  );
 }
 
 export default function Dashboard({ session }: DashboardProps) {
@@ -200,7 +205,17 @@ export default function Dashboard({ session }: DashboardProps) {
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [followUps, setFollowUps] = useState<FollowUpRow[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
+  const [unreadEmails, setUnreadEmails] = useState(0);
   const [loadingStats, setLoadingStats] = useState(true);
+
+  const userName = useMemo(() => {
+    const fullName = session.user.user_metadata?.full_name as
+      | string
+      | undefined;
+
+    if (fullName && fullName.trim()) return fullName;
+    return session.user.email ?? "Utilisateur";
+  }, [session]);
 
   const setActiveView = (view: ActiveView) => {
     setActiveViewState(view);
@@ -223,16 +238,6 @@ export default function Dashboard({ session }: DashboardProps) {
     setActiveViewState("clients");
   };
 
-  const userName = useMemo(() => {
-    const fullName = session.user.user_metadata?.full_name as
-      | string
-      | undefined;
-
-    if (fullName && fullName.trim()) return fullName;
-
-    return session.user.email ?? "Utilisateur";
-  }, [session]);
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
@@ -240,27 +245,34 @@ export default function Dashboard({ session }: DashboardProps) {
   const fetchDashboardData = async () => {
     setLoadingStats(true);
 
-    const [clientsRes, followUpsRes, campaignsRes] = await Promise.all([
-      supabase
-        .from("clients")
-        .select(
-          "id, first_name, last_name, email, phone, company, city, status, score, birthday, group_name, potential_amount, created_at, last_contact_at"
-        )
-        .eq("user_id", session.user.id)
-        .order("created_at", { ascending: false }),
+    const [clientsRes, followUpsRes, campaignsRes, inboxRes] =
+      await Promise.all([
+        supabase
+          .from("clients")
+          .select(
+            "id, first_name, last_name, email, phone, company, city, status, score, birthday, group_name, potential_amount, created_at, last_contact_at"
+          )
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false }),
 
-      supabase
-        .from("follow_ups")
-        .select("id, client_id, title, note, due_date, status, priority")
-        .eq("user_id", session.user.id)
-        .order("due_date", { ascending: true, nullsFirst: false }),
+        supabase
+          .from("follow_ups")
+          .select("id, client_id, title, note, due_date, status, priority")
+          .eq("user_id", session.user.id)
+          .order("due_date", { ascending: true, nullsFirst: false }),
 
-      supabase
-        .from("campaigns")
-        .select("id, status")
-        .eq("user_id", session.user.id)
-        .order("created_at", { ascending: false }),
-    ]);
+        supabase
+          .from("campaigns")
+          .select("id, status")
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false }),
+
+        supabase
+          .from("inbound_emails")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", session.user.id)
+          .neq("status", "read"),
+      ]);
 
     if (!clientsRes.error) {
       const enriched = ((clientsRes.data as ClientRow[]) || []).map(
@@ -281,11 +293,15 @@ export default function Dashboard({ session }: DashboardProps) {
       setCampaigns((campaignsRes.data as CampaignRow[]) || []);
     }
 
+    if (!inboxRes.error) {
+      setUnreadEmails(inboxRes.count || 0);
+    }
+
     setLoadingStats(false);
   };
 
   useEffect(() => {
-    if (activeView === "home" && session.user.id) {
+    if (session.user.id) {
       fetchDashboardData();
     }
   }, [activeView, session.user.id]);
@@ -305,7 +321,6 @@ export default function Dashboard({ session }: DashboardProps) {
 
     return followUps.filter((item) => {
       if (item.status === "done" || !item.due_date) return false;
-
       return new Date(item.due_date) <= now;
     });
   }, [followUps]);
@@ -321,9 +336,7 @@ export default function Dashboard({ session }: DashboardProps) {
 
     return followUps.filter((item) => {
       if (item.status === "done" || !item.due_date) return false;
-
       const due = new Date(item.due_date);
-
       return due.toDateString() === today.toDateString();
     });
   }, [followUps]);
@@ -353,7 +366,6 @@ export default function Dashboard({ session }: DashboardProps) {
 
     return clients.filter((client) => {
       const referenceDate = client.last_contact_at || client.created_at;
-
       return new Date(referenceDate) <= ninetyDaysAgo;
     });
   }, [clients]);
@@ -370,44 +382,39 @@ export default function Dashboard({ session }: DashboardProps) {
     }, 0);
   }, [clients]);
 
-  const readyCampaigns = campaigns.filter((c) => c.status === "ready").length;
-
   const stats = [
     {
-      label: "Clients totaux",
+      label: "Clients",
       value: loadingStats ? "..." : String(clients.length),
-      sub: "Portefeuille réel",
+      sub: "Portefeuille total",
       icon: Users,
     },
     {
-      label: "À relancer",
+      label: "Emails non lus",
+      value: loadingStats ? "..." : String(unreadEmails),
+      sub: "Réponses clients reçues",
+      icon: InboxIcon,
+    },
+    {
+      label: "Relances dues",
       value: loadingStats ? "..." : String(dueFollowUps.length),
-      sub: "Relances dues ou en retard",
+      sub: "À traiter maintenant",
       icon: Clock3,
     },
     {
-      label: "Pipeline estimé",
+      label: "Pipeline",
       value: loadingStats
         ? "..."
         : `${pipelineAmount.toLocaleString("fr-FR")}€`,
-      sub: "Somme des potentiels clients",
+      sub: "Potentiel estimé",
       icon: WalletCards,
-    },
-    {
-      label: "Campagnes prêtes",
-      value: loadingStats ? "..." : String(readyCampaigns),
-      sub: "Prêtes à envoyer",
-      icon: Mail,
     },
   ];
 
   const viewComponents: Record<Exclude<ActiveView, "home">, React.ReactNode> = {
     radar_ai: <RadarAI session={session} />,
-    clients: <Clients session={session} />,
-    campaigns: <Campaigns session={session} />,
-    welcome: <WelcomeBuilder session={session} />,
-    email_logs: <EmailLogs session={session} />,
-    follow_ups: <FollowUps session={session} />,
+    email_hub: <EmailHub session={session} />,
+    clients: <ClientsHub session={session} />,
     settings: <Settings session={session} />,
   };
 
@@ -417,6 +424,7 @@ export default function Dashboard({ session }: DashboardProps) {
         activeView={activeView}
         setActiveView={setActiveView}
         handleLogout={handleLogout}
+        unreadEmails={unreadEmails}
       >
         {viewComponents[activeView]}
       </AppShell>
@@ -428,60 +436,66 @@ export default function Dashboard({ session }: DashboardProps) {
       activeView={activeView}
       setActiveView={setActiveView}
       handleLogout={handleLogout}
+      unreadEmails={unreadEmails}
     >
       <div className="mx-auto w-full max-w-7xl">
-        <header className="mb-6 flex flex-col gap-5 sm:mb-8 lg:flex-row lg:items-center lg:justify-between">
+        <header className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/80 bg-white/75 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-violet-700 shadow-sm backdrop-blur-xl sm:px-4 sm:text-xs">
-              <Bot size={14} className="shrink-0" />
-              <span className="truncate">SaaS portefeuille client</span>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/75 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-violet-700 shadow-sm backdrop-blur-xl">
+              <Bot size={14} />
+              Portfolio Intelligence
             </div>
 
-            <h2 className="mt-4 text-3xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl md:text-5xl xl:text-6xl">
+            <h1 className="mt-4 text-3xl font-black leading-tight tracking-tight text-slate-950 sm:text-5xl xl:text-6xl">
               Bonjour, {userName}
-            </h2>
+            </h1>
 
             <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
-              MyPX te guide vers les bons clients, les bonnes relances et les
-              meilleures opportunités de conversation.
+              Ton cockpit MyPX centralise tes clients, réponses email, relances,
+              campagnes et opportunités IA.
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
             <button
-              onClick={() => setActiveView("clients")}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-sm font-black text-white shadow-xl shadow-slate-300 transition hover:-translate-y-0.5 hover:bg-black active:scale-[0.98]"
+              onClick={() => setActiveView("email_hub")}
+              className="relative inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-4 text-sm font-black text-slate-950 shadow-xl shadow-violet-100 transition hover:-translate-y-0.5"
             >
-              <Plus size={17} />
-              Gérer les clients
+              <InboxIcon size={17} />
+              Email
+              {unreadEmails > 0 && (
+                <span className="rounded-full bg-rose-500 px-2 py-0.5 text-xs text-white">
+                  {unreadEmails}
+                </span>
+              )}
             </button>
 
             <button
-              onClick={handleLogout}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/85 px-5 py-4 text-sm font-black text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:text-slate-950 active:scale-[0.98]"
+              onClick={() => setActiveView("clients")}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-sm font-black text-white shadow-xl shadow-slate-300 transition hover:-translate-y-0.5 hover:bg-black"
             >
-              <LogOut size={17} />
-              Déconnexion
+              <Plus size={17} />
+              Gérer les clients
             </button>
           </div>
         </header>
 
         {showOnboarding && (
-          <section className="mb-6 overflow-hidden rounded-[1.75rem] border border-white/80 bg-white/75 p-4 shadow-2xl shadow-violet-100 backdrop-blur-2xl sm:mb-8 sm:rounded-[2rem] sm:p-6">
+          <section className="mb-6 overflow-hidden rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-2xl shadow-violet-100 backdrop-blur-2xl sm:p-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-2xl">
-                <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-violet-700 sm:text-xs">
+                <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-violet-700">
                   <Sparkles size={14} />
-                  Première connexion
+                  Workflow conseillé
                 </div>
 
-                <h3 className="mt-4 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                  Bienvenue dans ton espace intelligent
-                </h3>
+                <h2 className="mt-4 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                  Fais vivre ton portefeuille sans effort.
+                </h2>
 
                 <p className="mt-3 text-sm leading-7 text-slate-600">
-                  Voici le workflow conseillé pour configurer ton environnement
-                  et commencer à exploiter ton portefeuille.
+                  MyPX devient ton assistant relationnel : il garde le lien,
+                  détecte les signaux et t’aide à agir au bon moment.
                 </p>
               </div>
 
@@ -495,21 +509,21 @@ export default function Dashboard({ session }: DashboardProps) {
             </div>
 
             <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {onboardingSteps.map((step, index) => (
+              {onboardingSteps.map((item, index) => (
                 <div
-                  key={step.title}
+                  key={item.title}
                   className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-violet-100"
                 >
                   <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-500">
                     Étape {index + 1}
                   </p>
 
-                  <h4 className="mt-3 text-base font-black text-slate-950 sm:text-lg">
-                    {step.title}
-                  </h4>
+                  <h3 className="mt-3 text-base font-black text-slate-950 sm:text-lg">
+                    {item.title}
+                  </h3>
 
                   <p className="mt-2 text-sm leading-6 text-slate-500">
-                    {step.description}
+                    {item.description}
                   </p>
                 </div>
               ))}
@@ -522,9 +536,14 @@ export default function Dashboard({ session }: DashboardProps) {
             const Icon = item.icon;
 
             return (
-              <div
+              <button
                 key={item.label}
-                className="rounded-[1.75rem] border border-white/80 bg-white/75 p-5 shadow-xl shadow-violet-100/50 backdrop-blur-2xl transition hover:-translate-y-1 sm:rounded-[2rem]"
+                onClick={() => {
+                  if (item.label === "Emails non lus") setActiveView("email_hub");
+                  if (item.label === "Clients") setActiveView("clients");
+                  if (item.label === "Relances dues") setActiveView("clients");
+                }}
+                className="rounded-[2rem] border border-white/80 bg-white/75 p-5 text-left shadow-xl shadow-violet-100/50 backdrop-blur-2xl transition hover:-translate-y-1"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
@@ -545,32 +564,32 @@ export default function Dashboard({ session }: DashboardProps) {
                     <Icon size={18} />
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </section>
 
         <section className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
           <PriorityCard
-            title="Relances aujourd’hui"
+            title="Aujourd’hui"
             value={loadingStats ? "..." : String(todayFollowUps.length)}
-            subtitle="À traiter immédiatement"
+            subtitle="Relances à traiter"
             tone="orange"
             emoji="🔥"
           />
 
           <PriorityCard
-            title="En retard"
-            value={loadingStats ? "..." : String(dueFollowUps.length)}
-            subtitle="Opportunités en danger"
+            title="Réponses client"
+            value={loadingStats ? "..." : String(unreadEmails)}
+            subtitle="Emails non lus"
             tone="amber"
-            emoji="⚠️"
+            emoji="📩"
           />
 
           <PriorityCard
-            title="À recontacter maintenant"
+            title="Dormants"
             value={loadingStats ? "..." : String(inactiveClients90.length)}
-            subtitle="Clients dormants à réveiller"
+            subtitle="90+ jours sans contact"
             tone="cyan"
             emoji="💡"
           />
@@ -639,7 +658,7 @@ export default function Dashboard({ session }: DashboardProps) {
                     tone="pink"
                     onAction={() => openClientFromDashboard(client.id)}
                   >
-                    🎂 Aujourd’hui : anniversaire de{" "}
+                    🎂 Anniversaire aujourd’hui :{" "}
                     {[client.first_name, client.last_name]
                       .filter(Boolean)
                       .join(" ") || "Client"}
@@ -666,7 +685,7 @@ export default function Dashboard({ session }: DashboardProps) {
                   <ReminderItem
                     key={`today-${item.id}`}
                     tone="slate"
-                    onAction={() => setActiveView("follow_ups")}
+                    onAction={() => setActiveView("clients")}
                   >
                     Aujourd’hui : {item.title}
                   </ReminderItem>
@@ -676,7 +695,7 @@ export default function Dashboard({ session }: DashboardProps) {
                   <ReminderItem
                     key={`due-${item.id}`}
                     tone="amber"
-                    onAction={() => setActiveView("follow_ups")}
+                    onAction={() => setActiveView("clients")}
                   >
                     En retard : {item.title}
                   </ReminderItem>
@@ -686,7 +705,7 @@ export default function Dashboard({ session }: DashboardProps) {
                   <ReminderItem
                     key={`urgent-${item.id}`}
                     tone="rose"
-                    onAction={() => setActiveView("follow_ups")}
+                    onAction={() => setActiveView("clients")}
                   >
                     Urgent : {item.title}
                   </ReminderItem>
@@ -698,7 +717,7 @@ export default function Dashboard({ session }: DashboardProps) {
                     tone="sky"
                     onAction={() => openClientFromDashboard(client.id)}
                   >
-                    90+ jours sans activité récente :{" "}
+                    90+ jours sans contact :{" "}
                     {[client.first_name, client.last_name]
                       .filter(Boolean)
                       .join(" ") || "Client"}
@@ -737,7 +756,7 @@ export default function Dashboard({ session }: DashboardProps) {
                   </p>
 
                   <button
-                    onClick={() => setActiveView("follow_ups")}
+                    onClick={() => setActiveView("clients")}
                     className="mt-3 text-xs font-black text-violet-600 hover:underline"
                   >
                     Traiter la relance →
@@ -752,10 +771,127 @@ export default function Dashboard({ session }: DashboardProps) {
   );
 }
 
+function EmailHub({ session }: { session: Session }) {
+  const [tab, setTab] = useState<"inbox" | "campaigns" | "welcome" | "logs">(
+    "inbox"
+  );
+
+  const tabs = [
+    { key: "inbox", label: "Boîte mail", icon: InboxIcon },
+    { key: "campaigns", label: "Campagnes", icon: Megaphone },
+    { key: "welcome", label: "Welcome", icon: Mail },
+    { key: "logs", label: "Logs", icon: Clock3 },
+  ] as const;
+
+  return (
+    <div className="mx-auto w-full max-w-7xl">
+      <div className="mb-5 rounded-[2rem] border border-white/80 bg-white/80 p-4 shadow-2xl shadow-violet-100 backdrop-blur-2xl sm:p-6">
+        <div className="mb-5">
+          <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-violet-700">
+            <InboxIcon size={14} />
+            Centre email MyPX
+          </div>
+
+          <h1 className="mt-4 text-2xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl">
+            Emails, campagnes, welcome et logs
+          </h1>
+
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+            Tout ce qui concerne la relation email est regroupé ici.
+          </p>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {tabs.map((item) => {
+            const Icon = item.icon;
+            const active = tab === item.key;
+
+            return (
+              <button
+                key={item.key}
+                onClick={() => setTab(item.key)}
+                className={`flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition active:scale-[0.98] ${
+                  active
+                    ? "bg-slate-950 text-white shadow-xl shadow-slate-300"
+                    : "bg-white text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-950"
+                }`}
+              >
+                <Icon size={17} />
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {tab === "inbox" && <Inbox session={session} />}
+      {tab === "campaigns" && <Campaigns session={session} />}
+      {tab === "welcome" && <WelcomeBuilder session={session} />}
+      {tab === "logs" && <EmailLogs session={session} />}
+    </div>
+  );
+}
+
+function ClientsHub({ session }: { session: Session }) {
+  const [tab, setTab] = useState<"clients" | "follow_ups">("clients");
+
+  const tabs = [
+    { key: "clients", label: "Portefeuille clients", icon: Users },
+    { key: "follow_ups", label: "Relances", icon: Bell },
+  ] as const;
+
+  return (
+    <div className="mx-auto w-full max-w-7xl">
+      <div className="mb-5 rounded-[2rem] border border-white/80 bg-white/80 p-4 shadow-2xl shadow-violet-100 backdrop-blur-2xl sm:p-6">
+        <div className="mb-5">
+          <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-violet-700">
+            <Users size={14} />
+            Portefeuille client
+          </div>
+
+          <h1 className="mt-4 text-2xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl">
+            Clients et relances
+          </h1>
+
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+            Gère tes fiches clients et ton suivi commercial au même endroit.
+          </p>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {tabs.map((item) => {
+            const Icon = item.icon;
+            const active = tab === item.key;
+
+            return (
+              <button
+                key={item.key}
+                onClick={() => setTab(item.key)}
+                className={`flex shrink-0 items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition active:scale-[0.98] ${
+                  active
+                    ? "bg-slate-950 text-white shadow-xl shadow-slate-300"
+                    : "bg-white text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-950"
+                }`}
+              >
+                <Icon size={17} />
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {tab === "clients" && <Clients session={session} />}
+      {tab === "follow_ups" && <FollowUps session={session} />}
+    </div>
+  );
+}
+
 type AppShellProps = {
   activeView: ActiveView;
   setActiveView: (view: ActiveView) => void;
   handleLogout: () => Promise<void>;
+  unreadEmails: number;
   children: React.ReactNode;
 };
 
@@ -763,6 +899,7 @@ function AppShell({
   activeView,
   setActiveView,
   handleLogout,
+  unreadEmails,
   children,
 }: AppShellProps) {
   return (
@@ -772,13 +909,18 @@ function AppShell({
       <div className="pointer-events-none fixed bottom-[-110px] right-[-110px] h-80 w-80 rounded-full bg-cyan-300/30 blur-3xl" />
 
       <div className="relative mx-auto flex min-h-screen max-w-[1680px]">
-        <Sidebar activeView={activeView} setActiveView={setActiveView} />
+        <Sidebar
+          activeView={activeView}
+          setActiveView={setActiveView}
+          unreadEmails={unreadEmails}
+        />
 
         <main className="w-full min-w-0 flex-1 px-4 pb-28 pt-4 sm:px-5 md:px-6 lg:pb-8 lg:pt-6 xl:px-8">
           <MobileTopBar
             activeView={activeView}
             setActiveView={setActiveView}
             handleLogout={handleLogout}
+            unreadEmails={unreadEmails}
           />
 
           {activeView !== "home" && (
@@ -803,7 +945,11 @@ function AppShell({
         </main>
       </div>
 
-      <MobileNav activeView={activeView} setActiveView={setActiveView} />
+      <MobileNav
+        activeView={activeView}
+        setActiveView={setActiveView}
+        unreadEmails={unreadEmails}
+      />
     </div>
   );
 }
@@ -811,9 +957,10 @@ function AppShell({
 type SidebarProps = {
   activeView: ActiveView;
   setActiveView: (view: ActiveView) => void;
+  unreadEmails: number;
 };
 
-function Sidebar({ activeView, setActiveView }: SidebarProps) {
+function Sidebar({ activeView, setActiveView, unreadEmails }: SidebarProps) {
   return (
     <aside className="sticky top-0 hidden h-screen w-80 shrink-0 overflow-y-auto border-r border-white/70 bg-white/55 p-6 shadow-2xl shadow-violet-100 backdrop-blur-2xl lg:block">
       <div className="rounded-[2rem] bg-slate-950 p-5 text-white shadow-2xl shadow-slate-300/40">
@@ -837,8 +984,8 @@ function Sidebar({ activeView, setActiveView }: SidebarProps) {
           </div>
 
           <p className="text-sm leading-6 text-white/65">
-            Ton assistant priorise les relances, détecte les signaux et rend ton
-            portefeuille plus vivant.
+            Ton assistant priorise les relances, détecte les signaux et classe
+            tes opportunités.
           </p>
         </div>
       </div>
@@ -847,19 +994,28 @@ function Sidebar({ activeView, setActiveView }: SidebarProps) {
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = activeView === item.view;
+          const showBadge = item.view === "email_hub" && unreadEmails > 0;
 
           return (
             <button
               key={item.view}
               onClick={() => setActiveView(item.view)}
-              className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-black transition active:scale-[0.98] ${
+              className={`flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left text-sm font-black transition active:scale-[0.98] ${
                 active
                   ? "bg-slate-950 text-white shadow-xl shadow-slate-300"
                   : "bg-white/70 text-slate-600 hover:bg-white hover:text-slate-950"
               }`}
             >
-              <Icon size={17} />
-              {item.label}
+              <span className="flex items-center gap-3">
+                <Icon size={17} />
+                {item.label}
+              </span>
+
+              {showBadge && (
+                <span className="rounded-full bg-rose-500 px-2 py-0.5 text-xs text-white">
+                  {unreadEmails}
+                </span>
+              )}
             </button>
           );
         })}
@@ -872,6 +1028,7 @@ function MobileTopBar({
   activeView,
   setActiveView,
   handleLogout,
+  unreadEmails,
 }: SidebarProps & {
   handleLogout: () => Promise<void>;
 }) {
@@ -897,30 +1054,46 @@ function MobileTopBar({
         </div>
       </button>
 
-      <button
-        onClick={handleLogout}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm"
-        aria-label="Déconnexion"
-      >
-        <LogOut size={18} />
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveView("email_hub")}
+          className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm"
+          aria-label="Email"
+        >
+          <InboxIcon size={18} />
+          {unreadEmails > 0 && (
+            <span className="absolute -right-1 -top-1 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-black text-white">
+              {unreadEmails}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={handleLogout}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm"
+          aria-label="Déconnexion"
+        >
+          <LogOut size={18} />
+        </button>
+      </div>
     </div>
   );
 }
 
-function MobileNav({ activeView, setActiveView }: SidebarProps) {
+function MobileNav({ activeView, setActiveView, unreadEmails }: SidebarProps) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/75 bg-white/90 px-2 py-2 shadow-2xl backdrop-blur-2xl lg:hidden">
-      <div className="mx-auto flex max-w-xl gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mx-auto flex max-w-xl justify-around gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = activeView === item.view;
+          const showBadge = item.view === "email_hub" && unreadEmails > 0;
 
           return (
             <button
               key={item.view}
               onClick={() => setActiveView(item.view)}
-              className={`flex min-w-[76px] flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[10px] font-black transition active:scale-[0.97] ${
+              className={`relative flex min-w-[76px] flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[10px] font-black transition active:scale-[0.97] ${
                 active
                   ? "bg-slate-950 text-white shadow-lg shadow-slate-300"
                   : "text-slate-500 hover:bg-slate-100"
@@ -928,6 +1101,12 @@ function MobileNav({ activeView, setActiveView }: SidebarProps) {
             >
               <Icon size={17} />
               <span className="max-w-[70px] truncate">{item.label}</span>
+
+              {showBadge && (
+                <span className="absolute right-2 top-1 rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] text-white">
+                  {unreadEmails}
+                </span>
+              )}
             </button>
           );
         })}
@@ -946,7 +1125,7 @@ function DashboardCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[1.75rem] border border-white/80 bg-white/75 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:rounded-[2rem] sm:p-6">
+    <div className="rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:p-6">
       <div className="flex items-center gap-2">
         {icon}
         <p className="text-sm font-black text-slate-800">{title}</p>
@@ -984,7 +1163,7 @@ function PriorityCard({
 
   return (
     <div
-      className={`rounded-[1.75rem] border p-5 shadow-xl transition hover:-translate-y-1 sm:rounded-[2rem] ${classes[tone]}`}
+      className={`rounded-[2rem] border p-5 shadow-xl transition hover:-translate-y-1 ${classes[tone]}`}
     >
       <div
         className={`flex items-center gap-2 text-sm font-black ${subClasses[tone]}`}
@@ -994,7 +1173,6 @@ function PriorityCard({
       </div>
 
       <p className="mt-3 text-3xl font-black">{value}</p>
-
       <p className={`mt-1 text-xs font-bold ${subClasses[tone]}`}>{subtitle}</p>
     </div>
   );

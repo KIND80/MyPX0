@@ -2,9 +2,11 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   BarChart3,
+  BellRing,
   Brain,
   CheckCircle2,
   ChevronRight,
+  Clock3,
   Mail,
   MousePointerClick,
   Radar,
@@ -19,32 +21,32 @@ const features = [
   {
     icon: Users,
     title: "CRM intelligent",
-    text: "Clients, groupes, statuts, notes, potentiel commercial et historique centralisés.",
+    text: "Centralise tes clients, prospects, groupes, statuts, notes, potentiel commercial et historique dans un seul espace simple.",
   },
   {
     icon: Mail,
-    title: "Campagnes email",
-    text: "Prépare des campagnes ciblées avec suivi des ouvertures, clics et performances.",
+    title: "Campagnes email ciblées",
+    text: "Envoie des campagnes personnalisées à tes groupes de clients avec suivi des ouvertures, clics et performances.",
+  },
+  {
+    icon: BellRing,
+    title: "Relances importantes",
+    text: "Anniversaires, clients inactifs, suivis à faire, opportunités chaudes : MyPX t’aide à ne plus rien oublier.",
   },
   {
     icon: BarChart3,
-    title: "Dashboard vivant",
-    text: "Visualise les relances, le pipeline, les campagnes et les opportunités en un coup d’œil.",
+    title: "Dashboard commercial",
+    text: "Visualise ton portefeuille, tes relances, ton pipeline, tes campagnes et tes actions prioritaires en un coup d’œil.",
   },
   {
     icon: Radar,
     title: "Radar IA",
-    text: "Détecte les signaux utiles pour relancer au bon moment avec le bon message.",
-  },
-  {
-    icon: CheckCircle2,
-    title: "Relances automatiques",
-    text: "Anniversaires, suivis importants, clients inactifs : plus aucun contact oublié.",
+    text: "Détecte les signaux utiles pour relancer le bon contact, au bon moment, avec le bon message.",
   },
   {
     icon: ShieldCheck,
-    title: "SaaS multi-user",
-    text: "Pensé pour les indépendants, équipes commerciales, réseaux et marques blanches.",
+    title: "Pensé SaaS & équipes",
+    text: "Une base solide pour indépendants, conseillers, commerciaux, réseaux, cabinets et offres en marque blanche.",
   },
 ];
 
@@ -56,16 +58,37 @@ const stats = [
 ];
 
 const radarSignals = [
-  "Un client devient une opportunité chaude",
-  "Une entreprise bouge ou recrute",
+  "Un client dormant devient une opportunité commerciale",
+  "Une entreprise bouge, recrute ou montre un signal intéressant",
   "Un contact mérite une relance personnalisée",
   "Une action commerciale est proposée automatiquement",
 ];
 
+const useCases = [
+  "Conseillers en assurance",
+  "Courtiers",
+  "Commerciaux indépendants",
+  "Agences et cabinets",
+  "Réseaux de vente",
+  "Entrepreneurs avec portefeuille client",
+];
+
 const plans = [
-  ["Starter", "Pour démarrer", "CRM + relances + groupes"],
-  ["Business", "Pour vendre plus", "Campagnes + stats + logs email"],
-  ["White Label", "Pour réseaux", "Multi-société + marque blanche"],
+  [
+    "Starter",
+    "Pour structurer ton suivi",
+    "CRM, clients, groupes, relances, notes et suivi simple du portefeuille.",
+  ],
+  [
+    "Business",
+    "Pour vendre plus intelligemment",
+    "Campagnes email, statistiques, logs, relances prioritaires et dashboard commercial.",
+  ],
+  [
+    "White Label",
+    "Pour réseaux et marques",
+    "Solution personnalisable pour équipes, réseaux commerciaux et déploiement en marque blanche.",
+  ],
 ];
 
 export default function LandingPage() {
@@ -74,7 +97,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen overflow-hidden bg-[#fbf7ef] text-slate-950">
       {/* NAVBAR */}
-      <header className="sticky top-0 z-50 border-b border-black/5 bg-[#fbf7ef]/80 backdrop-blur-2xl">
+      <header className="sticky top-0 z-50 border-b border-black/5 bg-[#fbf7ef]/85 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           <button
             onClick={() => navigate("/")}
@@ -99,6 +122,9 @@ export default function LandingPage() {
             <a href="#radar" className="transition hover:text-slate-950">
               Radar IA
             </a>
+            <a href="#usecases" className="transition hover:text-slate-950">
+              Pour qui ?
+            </a>
             <a href="#pricing" className="transition hover:text-slate-950">
               Offres
             </a>
@@ -107,7 +133,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate("/login")}
-              className="hidden rounded-full px-5 py-3 text-sm font800 font-bold text-slate-600 transition hover:bg-white sm:block"
+              className="hidden rounded-full px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-white sm:block"
             >
               Connexion
             </button>
@@ -132,49 +158,67 @@ export default function LandingPage() {
           <div>
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/70 px-4 py-2 text-sm font-bold text-slate-600 shadow-sm backdrop-blur-xl">
               <Radar size={16} className="text-violet-600" />
-              CRM intelligent qui crée des opportunités
+              CRM intelligent pour portefeuilles clients
             </div>
 
             <h1 className="max-w-3xl text-5xl font-black leading-[0.95] tracking-tight sm:text-6xl lg:text-7xl">
-              Réveille ton portefeuille client avec l’IA.
+              Transforme tes contacts dormants en opportunités.
             </h1>
 
             <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-              MyPX transforme tes contacts dormants en actions concrètes :
-              relances intelligentes, campagnes ciblées, suivi email,
-              historique client et radar IA pour détecter le bon moment.
+              MyPX aide les conseillers, commerciaux et entrepreneurs à mieux
+              suivre leur portefeuille client : relances intelligentes,
+              campagnes email, historique, rappels, statistiques et Radar IA.
             </p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              {["Suivi client", "Relances", "Campagnes", "IA commerciale"].map(
+                (item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-white/70 bg-white/70 px-4 py-2 text-xs font-black text-slate-600 shadow-sm backdrop-blur-xl"
+                  >
+                    {item}
+                  </span>
+                )
+              )}
+            </div>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button
                 onClick={() => navigate("/register")}
                 className="group inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-7 py-4 text-sm font-black text-white shadow-2xl shadow-slate-300 transition hover:-translate-y-1 hover:bg-black"
               >
-                Commencer maintenant
-                <ArrowRight size={18} className="transition group-hover:translate-x-1" />
+                Créer mon espace
+                <ArrowRight
+                  size={18}
+                  className="transition group-hover:translate-x-1"
+                />
               </button>
 
               <button
                 onClick={() => navigate("/login")}
                 className="inline-flex items-center justify-center gap-2 rounded-full border border-black/5 bg-white/75 px-7 py-4 text-sm font-black text-slate-800 shadow-sm backdrop-blur-xl transition hover:-translate-y-1 hover:bg-white"
               >
-                Voir mon espace
+                J’ai déjà un compte
                 <ChevronRight size={18} />
               </button>
             </div>
 
             <div className="mt-8 grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
               {[
-                ["+ intelligent", "relances guidées"],
-                ["0 oubli", "suivi automatique"],
-                ["SaaS ready", "multi-user"],
+                ["+ clair", "portefeuille structuré"],
+                ["0 oubli", "relances guidées"],
+                ["+ ventes", "actions prioritaires"],
               ].map(([title, subtitle]) => (
                 <div
                   key={title}
                   className="rounded-[1.5rem] border border-white/70 bg-white/65 p-4 shadow-sm backdrop-blur-xl transition hover:-translate-y-1"
                 >
                   <p className="font-black">{title}</p>
-                  <p className="text-sm font-medium text-slate-500">{subtitle}</p>
+                  <p className="text-sm font-medium text-slate-500">
+                    {subtitle}
+                  </p>
                 </div>
               ))}
             </div>
@@ -200,8 +244,8 @@ export default function LandingPage() {
                   <Wand2 size={18} />
                 </div>
                 <div>
-                  <p className="text-sm font-black">IA prête</p>
-                  <p className="text-xs text-slate-500">message proposé</p>
+                  <p className="text-sm font-black">Message IA</p>
+                  <p className="text-xs text-slate-500">prêt à envoyer</p>
                 </div>
               </div>
             </div>
@@ -242,7 +286,7 @@ export default function LandingPage() {
                       <p className="font-black">Suggestion IA</p>
                       <p className="mt-1 text-sm leading-6 text-slate-700">
                         12 clients inactifs peuvent être réactivés avec une
-                        campagne personnalisée.
+                        campagne personnalisée cette semaine.
                       </p>
                     </div>
                   </div>
@@ -264,6 +308,38 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* PROBLEM / SOLUTION */}
+      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className="rounded-[2rem] border border-white/70 bg-white/70 p-6 shadow-sm backdrop-blur-xl">
+            <Clock3 className="text-violet-600" size={26} />
+            <h3 className="mt-5 text-xl font-black">Tu oublies de relancer</h3>
+            <p className="mt-3 leading-7 text-slate-600">
+              Les clients importants passent après l’urgence du quotidien. MyPX
+              remet les bonnes actions devant toi.
+            </p>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/70 bg-white/70 p-6 shadow-sm backdrop-blur-xl">
+            <Mail className="text-violet-600" size={26} />
+            <h3 className="mt-5 text-xl font-black">Tes contacts dorment</h3>
+            <p className="mt-3 leading-7 text-slate-600">
+              Un portefeuille client non animé perd de la valeur. MyPX aide à
+              créer des conversations régulières et utiles.
+            </p>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/70 bg-white/70 p-6 shadow-sm backdrop-blur-xl">
+            <Brain className="text-violet-600" size={26} />
+            <h3 className="mt-5 text-xl font-black">Tu manques de signal</h3>
+            <p className="mt-3 leading-7 text-slate-600">
+              Le Radar IA aide à prioriser les clients à contacter et propose
+              des angles de relance plus pertinents.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* FEATURES */}
       <section id="features" className="mx-auto max-w-7xl px-4 py-20 sm:px-6">
         <div className="max-w-2xl">
@@ -273,6 +349,10 @@ export default function LandingPage() {
           <h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
             Tout pour animer ton portefeuille client.
           </h2>
+          <p className="mt-4 leading-8 text-slate-600">
+            MyPX ne sert pas seulement à stocker des contacts. Il t’aide à
+            décider qui relancer, pourquoi, quand et avec quel message.
+          </p>
         </div>
 
         <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -292,7 +372,10 @@ export default function LandingPage() {
       </section>
 
       {/* RADAR */}
-      <section id="radar" className="relative overflow-hidden bg-slate-950 py-20 text-white">
+      <section
+        id="radar"
+        className="relative overflow-hidden bg-slate-950 py-20 text-white"
+      >
         <div className="absolute right-[-120px] top-[-120px] h-80 w-80 rounded-full bg-violet-500/30 blur-3xl" />
         <div className="absolute bottom-[-120px] left-[-120px] h-80 w-80 rounded-full bg-cyan-500/25 blur-3xl" />
 
@@ -332,12 +415,43 @@ export default function LandingPage() {
             <div className="mt-5 rounded-3xl bg-white p-5 text-slate-950">
               <p className="text-sm font-black text-violet-700">Exemple IA</p>
               <p className="mt-2 text-lg font-black">
-                “Relance ce contact cette semaine avec une approche partenariat.”
+                “Relance ce contact cette semaine avec une approche
+                partenariat.”
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-500">
                 MyPX aide à passer de la donnée froide à une opportunité réelle.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* USE CASES */}
+      <section id="usecases" className="mx-auto max-w-7xl px-4 py-20 sm:px-6">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-center">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.24em] text-violet-600">
+              Pour qui ?
+            </p>
+            <h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
+              Pour tous ceux qui vivent de la relation client.
+            </h2>
+            <p className="mt-5 leading-8 text-slate-600">
+              MyPX est pensé pour les professionnels qui ont un portefeuille à
+              suivre, à animer et à convertir dans le temps.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {useCases.map((item) => (
+              <div
+                key={item}
+                className="flex items-center gap-3 rounded-3xl border border-white/70 bg-white/70 p-4 shadow-sm backdrop-blur-xl"
+              >
+                <CheckCircle2 size={20} className="text-violet-600" />
+                <p className="font-bold text-slate-700">{item}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -349,8 +463,12 @@ export default function LandingPage() {
             Offres
           </p>
           <h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
-            Une solution pensée pour les indépendants, équipes et réseaux.
+            Une solution pensée pour démarrer simple, puis évoluer.
           </h2>
+          <p className="mt-4 leading-8 text-slate-600">
+            Commence avec le CRM et les relances, puis ajoute les campagnes, le
+            suivi email, l’IA et les options équipe selon tes besoins.
+          </p>
         </div>
 
         <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-3">
@@ -370,10 +488,18 @@ export default function LandingPage() {
               )}
 
               <p className="text-2xl font-black">{name}</p>
-              <p className={`mt-2 text-sm ${index === 1 ? "text-white/55" : "text-slate-500"}`}>
+              <p
+                className={`mt-2 text-sm ${
+                  index === 1 ? "text-white/55" : "text-slate-500"
+                }`}
+              >
                 {subtitle}
               </p>
-              <p className={`mt-6 leading-7 ${index === 1 ? "text-white/70" : "text-slate-600"}`}>
+              <p
+                className={`mt-6 leading-7 ${
+                  index === 1 ? "text-white/70" : "text-slate-600"
+                }`}
+              >
                 {desc}
               </p>
 
@@ -405,7 +531,7 @@ export default function LandingPage() {
 
           <p className="mx-auto mt-4 max-w-2xl leading-7 text-slate-700">
             MyPX t’aide à transformer tes contacts dormants en conversations,
-            relances et opportunités concrètes.
+            relances, campagnes et opportunités concrètes.
           </p>
 
           <button

@@ -97,6 +97,24 @@ function hexToDummyImageColor(hex: string) {
   return normalizeColor(hex).replace("#", "");
 }
 
+function normalizeWhatsappNumber(value: string) {
+  return value.replace(/[^\d+]/g, "").trim();
+}
+
+function buildWhatsappLink(value: string) {
+  const clean = normalizeWhatsappNumber(value);
+
+  if (!clean) return "";
+
+  const international = clean.startsWith("+")
+    ? clean.replace("+", "")
+    : clean.startsWith("00")
+    ? clean.slice(2)
+    : clean;
+
+  return `https://wa.me/${international}`;
+}
+
 export default function WelcomeBuilder({ session }: WelcomeBuilderProps) {
   const [loading, setLoading] = useState(false);
   const [loadingTemplate, setLoadingTemplate] = useState(true);
@@ -122,7 +140,7 @@ export default function WelcomeBuilder({ session }: WelcomeBuilderProps) {
   const [advisorPhotoUrl, setAdvisorPhotoUrl] = useState("");
 
   const [introTitle, setIntroTitle] = useState(
-    "Bienvenue dans notre portefeuille client"
+    "Bienvenue dans mon portefeuille client"
   );
 
   const [introText, setIntroText] = useState(defaultIntroText);
@@ -243,6 +261,7 @@ export default function WelcomeBuilder({ session }: WelcomeBuilderProps) {
     const softBrandBg = hexToRgba(brandColor, 0.08);
     const mediumBrandBg = hexToRgba(brandColor, 0.14);
     const shadowBrand = hexToRgba(brandColor, 0.24);
+    const whatsappLink = buildWhatsappLink(whatsappUrl);
 
     return `
 <div style="margin:0;padding:0;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
@@ -335,14 +354,14 @@ ${customIntroText}
           </a>
 
           ${
-            whatsappUrl
-              ? `<a href="${whatsappUrl}" style="display:inline-block;background:#25D366;color:#ffffff;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:800;font-size:14px;margin:0 8px 10px 0;">WhatsApp</a>`
+            whatsappLink
+              ? `<a href="${whatsappLink}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#25D366;color:#ffffff;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:800;font-size:14px;margin:0 8px 10px 0;">WhatsApp</a>`
               : ""
           }
 
           ${
             bookingUrl
-              ? `<a href="${bookingUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:800;font-size:14px;margin:0 8px 10px 0;">Prendre RDV</a>`
+              ? `<a href="${bookingUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:800;font-size:14px;margin:0 8px 10px 0;">Prendre RDV</a>`
               : ""
           }
         </div>
@@ -417,6 +436,7 @@ ${customIntroText}
 
     setLoading(true);
 
+    const safeWhatsappNumber = normalizeWhatsappNumber(whatsappUrl);
     const htmlContent = generateHtml(safeContent);
 
     const onboardingPayload = {
@@ -431,7 +451,7 @@ ${customIntroText}
       advisor_name: advisorName,
       advisor_role: advisorRole,
       advisor_photo_url: advisorPhotoUrl,
-      whatsapp_url: whatsappUrl,
+      whatsapp_url: safeWhatsappNumber,
       booking_url: bookingUrl,
       welcome_subject: safeSubject,
       welcome_content: safeContent,
@@ -449,6 +469,8 @@ ${customIntroText}
       alert(onboardingError.message);
       return;
     }
+
+    setWhatsappUrl(safeWhatsappNumber);
 
     const templatePayload = {
       user_id: session.user.id,
@@ -688,8 +710,14 @@ ${customIntroText}
               <Input
                 value={whatsappUrl}
                 onChange={setWhatsappUrl}
-                placeholder="Lien WhatsApp, ex: +41797896193"
+                placeholder="Numéro WhatsApp, ex: +41797896193"
               />
+            </div>
+
+            <div className="mt-2 rounded-2xl bg-emerald-50 px-4 py-3 text-xs font-bold leading-5 text-emerald-700">
+              Le bouton ouvrira WhatsApp automatiquement via wa.me.
+              Exemple généré :{" "}
+              {whatsappUrl ? buildWhatsappLink(whatsappUrl) : "aucun numéro"}
             </div>
 
             <div className="mt-3 flex items-center gap-2">
