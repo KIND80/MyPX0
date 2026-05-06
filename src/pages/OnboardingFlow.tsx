@@ -834,13 +834,7 @@ function SecondaryButton({
   );
 }
 
-function MiniReady({
-  icon,
-  label,
-}: {
-  icon: React.ReactNode;
-  label: string;
-}) {
+function MiniReady({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <div className="flex items-center justify-center gap-2 rounded-2xl bg-white/10 px-3 py-3 text-xs font-black text-white">
       {icon}
@@ -862,8 +856,8 @@ function SummaryLine({ label, value }: { label: string; value: string }) {
 
 function replaceVariables(value: string, data: OnboardingData) {
   return value
-    .replaceAll("{{first_name}}", "Alexandre")
-    .replaceAll("{{last_name}}", "Martin")
-    .replaceAll("{{advisor_name}}", data.advisor_name || "Votre nom")
-    .replaceAll("{{company_name}}", data.company_name || "Votre entreprise");
+    .replace(/{{first_name}}/g, "Alexandre")
+    .replace(/{{last_name}}/g, "Martin")
+    .replace(/{{advisor_name}}/g, data.advisor_name || "Votre nom")
+    .replace(/{{company_name}}/g, data.company_name || "Votre entreprise");
 }
