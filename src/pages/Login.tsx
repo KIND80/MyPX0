@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  AlertCircle,
   ArrowRight,
   Brain,
   CheckCircle2,
@@ -20,22 +21,59 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
+
     setLoading(true);
+    setErrorMessage("");
+    setSuccessMessage("");
 
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim(),
       password,
     });
 
     setLoading(false);
 
     if (error) {
-      alert(error.message);
+      setErrorMessage(
+        "Connexion impossible. Vérifie ton email et ton mot de passe."
+      );
       return;
     }
+  };
+
+  const handleResetPassword = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!email.trim()) {
+      setErrorMessage(
+        "Entre ton email avant de demander la réinitialisation du mot de passe."
+      );
+      return;
+    }
+
+    setResetLoading(true);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/login`,
+    });
+
+    setResetLoading(false);
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    setSuccessMessage(
+      "Un email de réinitialisation vient d’être envoyé si cette adresse existe."
+    );
   };
 
   return (
@@ -45,7 +83,6 @@ export default function Login() {
       <div className="absolute bottom-[-110px] right-[-110px] h-80 w-80 animate-pulse rounded-full bg-cyan-300/35 blur-3xl" />
 
       <div className="relative mx-auto grid min-h-screen max-w-7xl grid-cols-1 lg:grid-cols-2">
-        {/* LEFT */}
         <div className="hidden flex-col justify-between p-10 lg:flex">
           <div>
             <Link to="/" className="inline-flex items-center gap-3">
@@ -86,7 +123,7 @@ export default function Login() {
             ].map((item) => (
               <div
                 key={item}
-                className="rounded-3xl border border-white/70 bg-white/65 p-4 text-sm font-bold text-slate-650 shadow-sm backdrop-blur-xl"
+                className="rounded-3xl border border-white/70 bg-white/65 p-4 text-sm font-bold text-slate-600 shadow-sm backdrop-blur-xl"
               >
                 <CheckCircle2 className="mb-3 h-5 w-5 text-emerald-600" />
                 {item}
@@ -95,31 +132,45 @@ export default function Login() {
           </div>
         </div>
 
-        {/* RIGHT */}
-        <div className="flex items-center justify-center px-4 py-8 sm:px-6 lg:p-10">
-          <div className="w-full max-w-md rounded-[2rem] border border-white/75 bg-white/75 p-5 shadow-2xl shadow-violet-200/60 backdrop-blur-2xl sm:p-8">
+        <div className="flex min-h-screen items-center justify-center px-4 py-6 sm:px-6 lg:p-10">
+          <div className="w-full max-w-md rounded-[2rem] border border-white/75 bg-white/80 p-5 shadow-2xl shadow-violet-200/60 backdrop-blur-2xl sm:p-8">
+            <Link to="/" className="mb-7 flex items-center gap-3 lg:hidden">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-500 to-cyan-400 text-white shadow-xl shadow-violet-200">
+                <Sparkles size={20} />
+              </div>
+
+              <div>
+                <p className="text-lg font-black tracking-tight">MyPX</p>
+                <p className="text-xs font-bold text-slate-500">
+                  Portfolio Intelligence
+                </p>
+              </div>
+            </Link>
+
             <div className="mb-7 flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-black uppercase tracking-[0.22em] text-violet-600">
                   Connexion
                 </p>
+
                 <h2 className="mt-3 text-3xl font-black tracking-tight">
                   Bienvenue sur MyPX
                 </h2>
+
                 <p className="mt-2 text-sm leading-6 text-slate-500">
                   Accède à ton dashboard, tes clients, tes campagnes et tes
                   relances intelligentes.
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-slate-950 p-3 text-white shadow-lg shadow-slate-300">
+              <div className="hidden rounded-2xl bg-slate-950 p-3 text-white shadow-lg shadow-slate-300 sm:block">
                 <ShieldCheck size={21} />
               </div>
             </div>
 
             <div className="mb-5 rounded-[1.4rem] border border-violet-100 bg-violet-50/70 p-4">
               <div className="flex items-start gap-3">
-                <Wand2 className="mt-0.5 h-5 w-5 text-violet-700" />
+                <Wand2 className="mt-0.5 h-5 w-5 shrink-0 text-violet-700" />
                 <div>
                   <p className="text-sm font-black text-slate-900">
                     IA prête à travailler
@@ -131,6 +182,24 @@ export default function Login() {
                 </div>
               </div>
             </div>
+
+            {errorMessage && (
+              <div className="mb-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold leading-6 text-rose-700">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={17} className="mt-0.5 shrink-0" />
+                  <span>{errorMessage}</span>
+                </div>
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold leading-6 text-emerald-700">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 size={17} className="mt-0.5 shrink-0" />
+                  <span>{successMessage}</span>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-violet-300 focus-within:ring-4 focus-within:ring-violet-100">
@@ -144,6 +213,8 @@ export default function Login() {
                   placeholder="ton@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  inputMode="email"
                   className="w-full bg-transparent text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300"
                   required
                 />
@@ -161,6 +232,7 @@ export default function Login() {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
                     className="w-full bg-transparent text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300"
                     required
                   />
@@ -168,11 +240,27 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((value) => !value)}
+                    aria-label={
+                      showPassword
+                        ? "Masquer le mot de passe"
+                        : "Afficher le mot de passe"
+                    }
                     className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                   >
                     {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                   </button>
                 </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleResetPassword}
+                  disabled={resetLoading}
+                  className="text-xs font-black text-violet-700 underline underline-offset-4 transition hover:text-violet-900 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {resetLoading ? "Envoi en cours..." : "Mot de passe oublié ?"}
+                </button>
               </div>
 
               <button
