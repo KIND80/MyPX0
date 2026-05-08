@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type React from "react";
+import * as XLSX from "xlsx";
 import { Session } from "@supabase/supabase-js";
 import {
   AlertTriangle,
@@ -391,42 +392,52 @@ export default function Clients({ session }: ClientsProps) {
     fetchClients();
   };
 
+  const getExportRows = () =>
+    filteredClients.map((client) => ({
+      Prénom: client.first_name || "",
+      Nom: client.last_name || "",
+      Email: client.email || "",
+      Téléphone: client.phone || "",
+      Société: client.company || "",
+      Ville: client.city || "",
+      Réseau: client.group_name || "",
+      Statut: client.status || "",
+      Score: client.score || 0,
+      "Indice IA": client.ai_score || 0,
+      Potentiel: client.potential_amount || 0,
+      "Dernier contact": client.last_contact_at || "",
+      "Créé le": client.created_at || "",
+      Renseignements: client.notes || "",
+    }));
+
   const handleExportCsv = () => {
-    const headers = [
-      "Prénom",
-      "Nom",
-      "Email",
-      "Téléphone",
-      "Société",
-      "Ville",
-      "Réseau",
-      "Statut",
-      "Score",
-      "Indice IA",
-      "Potentiel",
-      "Dernier contact",
-      "Créé le",
-      "Renseignements",
-    ];
+    const rows = getExportRows();
 
-    const rows = filteredClients.map((client) => [
-      client.first_name,
-      client.last_name,
-      client.email,
-      client.phone,
-      client.company,
-      client.city,
-      client.group_name,
-      client.status,
-      client.score,
-      client.ai_score,
-      client.potential_amount,
-      client.last_contact_at,
-      client.created_at,
-      client.notes,
-    ]);
+    const headers = Object.keys(
+      rows[0] || {
+        Prénom: "",
+        Nom: "",
+        Email: "",
+        Téléphone: "",
+        Société: "",
+        Ville: "",
+        Réseau: "",
+        Statut: "",
+        Score: "",
+        "Indice IA": "",
+        Potentiel: "",
+        "Dernier contact": "",
+        "Créé le": "",
+        Renseignements: "",
+      }
+    );
 
-    const csvContent = [headers, ...rows]
+    const csvContent = [
+      headers,
+      ...rows.map((row) =>
+        headers.map((header) => row[header as keyof typeof row])
+      ),
+    ]
       .map((row) => row.map(csvEscape).join(";"))
       .join("\n");
 
@@ -442,6 +453,18 @@ export default function Clients({ session }: ClientsProps) {
       .slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportXlsx = () => {
+    const worksheet = XLSX.utils.json_to_sheet(getExportRows());
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Dossiers MyPX");
+
+    XLSX.writeFile(
+      workbook,
+      `dossiers-mypx-${new Date().toISOString().slice(0, 10)}.xlsx`
+    );
   };
 
   const renderVariables = (text: string, insertedClient: Client) =>
@@ -552,6 +575,7 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
         .eq("user_id", session.user.id);
     }
   };
+
   const buildWelcomeEmailForQueue = async (insertedClient: Client) => {
     const { data: welcomeTemplate, error: templateError } = await supabase
       .from("email_templates")
@@ -575,17 +599,17 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       renderedSubject = `Bienvenue ${insertedClient.first_name || ""}`.trim();
 
       renderedContent = `
-  Bonjour ${insertedClient.first_name || ""},
-  
-  Ravi de vous compter parmi nos contacts.
-  
-  Vous pouvez simplement répondre à cet email si vous souhaitez échanger ou préciser votre besoin.
-  
-  À bientôt,
-  ${settings?.advisor_name || settings?.company_name || "MyPX"}
-  ${settings?.company_phone || ""}
-  ${settings?.company_website || ""}
-  `.trim();
+Bonjour ${insertedClient.first_name || ""},
+
+Ravi de vous compter parmi nos contacts.
+
+Vous pouvez simplement répondre à cet email si vous souhaitez échanger ou préciser votre besoin.
+
+À bientôt,
+${settings?.advisor_name || settings?.company_name || "MyPX"}
+${settings?.company_phone || ""}
+${settings?.company_website || ""}
+`.trim();
     }
 
     if (!renderedSubject) {
@@ -594,13 +618,13 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
 
     if (!renderedContent) {
       renderedContent = `
-  Bonjour ${insertedClient.first_name || ""},
-  
-  Ravi de vous compter parmi nos contacts.
-  
-  À bientôt,
-  ${settings?.advisor_name || settings?.company_name || "MyPX"}
-  `.trim();
+Bonjour ${insertedClient.first_name || ""},
+
+Ravi de vous compter parmi nos contacts.
+
+À bientôt,
+${settings?.advisor_name || settings?.company_name || "MyPX"}
+`.trim();
     }
 
     return {
@@ -609,6 +633,7 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       content: renderedContent,
     };
   };
+
   const isValidEmail = (email: string) =>
     !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -633,7 +658,18 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
     return errors;
   };
 
-  const parseCsvLine = (line: string) => {
+  const detectSeparator = (line: string) => {
+    const separators = [";", ",", "\t"];
+
+    return separators.reduce((best, current) => {
+      const currentCount = line.split(current).length;
+      const bestCount = line.split(best).length;
+
+      return currentCount > bestCount ? current : best;
+    }, ";");
+  };
+
+  const parseCsvLine = (line: string, separator: string) => {
     const result: string[] = [];
     let current = "";
     let insideQuotes = false;
@@ -647,7 +683,7 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
         i++;
       } else if (char === '"') {
         insideQuotes = !insideQuotes;
-      } else if ((char === ";" || char === ",") && !insideQuotes) {
+      } else if (char === separator && !insideQuotes) {
         result.push(current.trim());
         current = "";
       } else {
@@ -666,7 +702,7 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]/g, "");
-  
+
   const FIELD_ALIASES: Record<keyof NewClientForm, string[]> = {
     first_name: [
       "prenom",
@@ -693,6 +729,8 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       "adresse email",
       "courriel",
       "email address",
+      "mail pro",
+      "email pro",
     ],
     phone: [
       "telephone",
@@ -704,6 +742,7 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       "numero",
       "numéro",
       "phone number",
+      "tel portable",
     ],
     company: [
       "societe",
@@ -715,14 +754,7 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       "organization",
       "structure",
     ],
-    city: [
-      "ville",
-      "city",
-      "localite",
-      "localité",
-      "commune",
-      "lieu",
-    ],
+    city: ["ville", "city", "localite", "localité", "commune", "lieu"],
     birthday: [
       "anniversaire",
       "birthday",
@@ -743,20 +775,14 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       "source",
       "origine",
     ],
-    status: [
-      "statut",
-      "status",
-      "etat",
-      "état",
-      "stage",
-      "pipeline",
-    ],
+    status: ["statut", "status", "etat", "état", "stage", "pipeline"],
     potential_amount: [
       "potentiel",
       "potential_amount",
       "montant",
       "valeur",
       "budget",
+      "budget potentiel",
       "ca",
       "chiffre affaire",
       "chiffre d affaire",
@@ -774,48 +800,133 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       "message",
       "details",
       "détails",
+      "infos diverses",
+      "commentaire perso",
     ],
   };
-  
+
   const getFieldValue = (
     row: Record<string, string>,
     field: keyof NewClientForm
   ) => {
     const aliases = FIELD_ALIASES[field] || [];
-  
+
     for (const alias of aliases) {
       const normalizedAlias = normalizeHeader(alias);
       const found = row[normalizedAlias];
-  
+
       if (found && String(found).trim()) {
         return String(found).trim();
       }
     }
-  
+
     return "";
   };
-  
+
   const cleanPotentialAmount = (value: string) => {
     if (!value) return "";
-  
+
     const cleaned = String(value)
       .replace(/[^\d,.-]/g, "")
       .replace(",", ".");
-  
+
     const number = Number(cleaned);
-  
+
     return Number.isFinite(number) ? String(number) : "";
   };
-  
+
   const cleanStatus = (value: string) => {
     const normalized = normalizeHeader(value);
-  
-    if (["client", "relationactive", "actif"].includes(normalized)) return "client";
-    if (["chaud", "hot", "urgent"].includes(normalized)) return "chaud";
-    if (["arelancer", "relance", "relancer", "suivi"].includes(normalized))
+
+    if (["client", "relationactive", "actif"].includes(normalized)) {
+      return "client";
+    }
+
+    if (["chaud", "hot", "urgent", "hotlead"].includes(normalized)) {
+      return "chaud";
+    }
+
+    if (["arelancer", "relance", "relancer", "suivi"].includes(normalized)) {
       return "a_relancer";
-  
+    }
+
     return "prospect";
+  };
+
+  const splitFullName = (fullName: string) => {
+    const parts = fullName.trim().split(/\s+/).filter(Boolean);
+
+    if (parts.length === 0) return { firstName: "", lastName: "" };
+    if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+
+    return {
+      firstName: parts[0],
+      lastName: parts.slice(1).join(" "),
+    };
+  };
+
+  const getFullNameValue = (row: Record<string, string>) => {
+    const aliases = [
+      "nom complet",
+      "fullname",
+      "full name",
+      "contact",
+      "contact name",
+      "client",
+      "customer name",
+      "name",
+      "nom prenom",
+      "nom prénom",
+    ];
+
+    for (const alias of aliases) {
+      const found = row[normalizeHeader(alias)];
+      if (found && String(found).trim()) return String(found).trim();
+    }
+
+    return "";
+  };
+
+  const normalizeRawRow = (headers: string[], values: string[]) => {
+    const rawRow: Record<string, string> = {};
+
+    headers.forEach((header, index) => {
+      rawRow[normalizeHeader(header)] = values[index] || "";
+    });
+
+    return rawRow;
+  };
+
+  const buildImportRowFromRaw = (
+    rawRow: Record<string, string>,
+    index: number
+  ): ImportClientRow => {
+    const fullName = getFullNameValue(rawRow);
+    const splitted = splitFullName(fullName);
+
+    const row: ImportClientRow = {
+      id: `${Date.now()}-${index}`,
+      selected: true,
+      first_name: getFieldValue(rawRow, "first_name") || splitted.firstName,
+      last_name: getFieldValue(rawRow, "last_name") || splitted.lastName,
+      email: getFieldValue(rawRow, "email").toLowerCase(),
+      phone: getFieldValue(rawRow, "phone"),
+      company: getFieldValue(rawRow, "company"),
+      city: getFieldValue(rawRow, "city"),
+      birthday: getFieldValue(rawRow, "birthday"),
+      group_name: getFieldValue(rawRow, "group_name"),
+      status: cleanStatus(getFieldValue(rawRow, "status")),
+      potential_amount: cleanPotentialAmount(
+        getFieldValue(rawRow, "potential_amount")
+      ),
+      notes: getFieldValue(rawRow, "notes"),
+      errors: [],
+    };
+
+    row.errors = validateImportRow(row);
+    row.selected = row.errors.length === 0;
+
+    return row;
   };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -823,54 +934,81 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
     if (!file) return;
 
     setImportFileName(file.name);
+    setImportRows([]);
 
-    const text = await file.text();
-    const lines = text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
+    const extension = file.name.split(".").pop()?.toLowerCase();
 
-    if (lines.length < 2) {
-      alert("Le fichier semble vide ou incomplet.");
-      return;
+    try {
+      let rows: ImportClientRow[] = [];
+
+      if (extension === "xlsx" || extension === "xls") {
+        const buffer = await file.arrayBuffer();
+
+        const workbook = XLSX.read(buffer, {
+          type: "array",
+        });
+
+        const firstSheetName = workbook.SheetNames[0];
+
+        if (!firstSheetName) {
+          alert("Aucune feuille Excel détectée.");
+          return;
+        }
+
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        const jsonRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+          worksheet,
+          {
+            defval: "",
+          }
+        );
+
+        if (jsonRows.length === 0) {
+          alert("Le fichier Excel semble vide.");
+          return;
+        }
+
+        rows = jsonRows.map((item, index) => {
+          const rawRow: Record<string, string> = {};
+
+          Object.entries(item).forEach(([key, value]) => {
+            rawRow[normalizeHeader(key)] = String(value || "").trim();
+          });
+
+          return buildImportRowFromRaw(rawRow, index);
+        });
+      } else {
+        const text = await file.text();
+
+        const lines = text
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+
+        if (lines.length < 2) {
+          alert("Le fichier CSV semble vide ou incomplet.");
+          return;
+        }
+
+        const separator = detectSeparator(lines[0]);
+        const headers = parseCsvLine(lines[0], separator);
+
+        rows = lines.slice(1).map((line, index) => {
+          const values = parseCsvLine(line, separator);
+          const rawRow = normalizeRawRow(headers, values);
+
+          return buildImportRowFromRaw(rawRow, index);
+        });
+      }
+
+      setImportRows(rows);
+    } catch (error) {
+      console.error("Erreur import Sentinel:", error);
+      alert("Impossible de lire ce fichier. Vérifie le format CSV ou Excel.");
+    } finally {
+      e.target.value = "";
     }
-
-    const headers = parseCsvLine(lines[0]).map(normalizeHeader);
-
-    const rows = lines.slice(1).map((line, index) => {
-      const values = parseCsvLine(line);
-      const rawRow: Record<string, string> = {};
-
-      headers.forEach((header, i) => {
-        rawRow[header] = values[i] || "";
-      });
-
-      const row: ImportClientRow = {
-        id: `${Date.now()}-${index}`,
-        selected: true,
-        first_name: getFieldValue(rawRow, "first_name"),
-        last_name: getFieldValue(rawRow, "last_name"),
-        email: getFieldValue(rawRow, "email").toLowerCase(),
-        phone: getFieldValue(rawRow, "phone"),
-        company: getFieldValue(rawRow, "company"),
-        city: getFieldValue(rawRow, "city"),
-        birthday: getFieldValue(rawRow, "birthday"),
-        group_name: getFieldValue(rawRow, "group_name"),
-        status: cleanStatus(getFieldValue(rawRow, "status")),
-        potential_amount: cleanPotentialAmount(
-          getFieldValue(rawRow, "potential_amount")
-        ),
-        notes: getFieldValue(rawRow, "notes"),
-        errors: [],
-      };
-
-      row.errors = validateImportRow(row);
-      row.selected = row.errors.length === 0;
-
-      return row;
-    });
-
-    setImportRows(rows);
   };
 
   const updateImportRow = (
@@ -927,8 +1065,8 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       group_name: row.group_name || null,
       status: row.status || "prospect",
       potential_amount: row.potential_amount
-  ? Number(cleanPotentialAmount(row.potential_amount))
-  : 0,
+        ? Number(cleanPotentialAmount(row.potential_amount))
+        : 0,
       notes: row.notes || null,
       last_contact_at: null,
       score: 0,
@@ -948,6 +1086,7 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
 
     if (prepareQueuedEmails && insertedClients?.length) {
       const delay = Math.max(Number(queueDelayMinutes || 2), 1);
+
       const clientsWithEmail = (insertedClients as Client[]).filter(
         (client) => client.email
       );
@@ -1095,7 +1234,15 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
               className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-white/15"
             >
               <Download size={16} />
-              Exporter les dossiers
+              Export CSV
+            </button>
+
+            <button
+              onClick={handleExportXlsx}
+              className="inline-flex items-center gap-2 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm font-black text-emerald-100 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-400/15"
+            >
+              <FileSpreadsheet size={16} />
+              Export Excel
             </button>
 
             <button
@@ -1320,9 +1467,8 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
                 </h3>
 
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-                  PX Sentinel lit ton fichier, prépare un tableau de contrôle et
-                  te laisse valider chaque fiche avant création. Aucun email
-                  n’est envoyé automatiquement.
+                  PX Sentinel lit ton fichier CSV ou Excel, détecte les colonnes
+                  utiles et ignore les données inutiles avant création.
                 </p>
               </div>
 
@@ -1337,15 +1483,15 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
             <label className="mb-5 flex cursor-pointer flex-col items-center justify-center rounded-[1.5rem] border-2 border-dashed border-cyan-200 bg-cyan-50/70 p-6 text-center transition hover:bg-cyan-50">
               <Upload className="mb-3 h-8 w-8 text-cyan-700" />
               <span className="text-sm font-black text-slate-950">
-                Déposer un fichier CSV
+                Déposer un fichier CSV ou Excel
               </span>
               <span className="mt-1 text-xs text-slate-500">
-                Colonnes acceptées : prénom, nom, email, téléphone, société,
-                ville, groupe, statut, potentiel, notes.
+                CSV ou Excel accepté. PX Sentinel détecte les colonnes utiles et
+                ignore les données inutiles.
               </span>
               <input
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                 onChange={handleImportFile}
                 className="hidden"
               />
@@ -1907,7 +2053,7 @@ function FormInput({
   type?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-violet-300 focus-within:ring-4 focus-within:ring-violet-100">
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-violet-300 focus-within:ring-4 focus:ring-violet-100">
       <label className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
         {icon}
         {placeholder}
