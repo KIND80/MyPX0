@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -22,15 +23,23 @@ import {
   Target,
   TrendingUp,
   MessageCircle,
-  CalendarDays,
   Flame,
+  MapPin,
+  BriefcaseBusiness,
+  Smartphone,
+  BadgeCheck,
 } from "lucide-react";
 
 const features = [
   {
     icon: Users,
-    title: "Dossiers clients centralisés",
-    text: "Clients, prospects, groupes, statuts, notes, potentiel commercial, historique et informations importantes réunis au même endroit.",
+    title: "CRM intelligent pour entrepreneurs",
+    text: "Centralise tes clients, prospects, groupes, statuts, notes, potentiel commercial et historique dans un CRM IA simple et moderne.",
+  },
+  {
+    icon: Smartphone,
+    title: "Carte de visite intelligente",
+    text: "Transforme ton profil professionnel en carte de visite digitale connectée à ton portefeuille client, tes relances et tes opportunités.",
   },
   {
     icon: BellRing,
@@ -48,23 +57,18 @@ const features = [
     text: "Envoie des campagnes personnalisées à tes groupes de clients avec suivi des ouvertures, clics et performances.",
   },
   {
-    icon: BarChart3,
-    title: "Centre de commandement",
-    text: "Visualise tes dossiers, tes actions prioritaires, ton pipeline, tes campagnes et tes résultats depuis un dashboard clair.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Pensé pour évoluer",
-    text: "Une base solide pour indépendants, conseillers, commerciaux, cabinets, réseaux de vente et solutions en marque blanche.",
+    icon: MapPin,
+    title: "Pensé pour Genève, Vaud, Gex et Ferney",
+    text: "Une solution adaptée aux entrepreneurs, indépendants, conseillers et commerciaux en Suisse romande et zone frontalière franco-suisse.",
   },
 ];
 
 const stats = [
-  ["Dossiers suivis", "248"],
-  ["Signaux IA", "18"],
-  ["Opérations", "7"],
-  ["Pipeline estimé", "86k€"],
-];
+  ["Dossiers suivis", 248, "", Users],
+  ["Signaux IA", 18, "", Radar],
+  ["Opérations", 7, "", Flame],
+  ["Pipeline estimé", 86, "k€", TrendingUp],
+] as const;
 
 const problems = [
   {
@@ -140,12 +144,26 @@ const radarSignals = [
 ];
 
 const useCases = [
+  "Entrepreneurs à Genève",
+  "Indépendants dans le canton de Vaud",
+  "Professionnels du Pays de Gex",
+  "Entreprises à Ferney-Voltaire",
   "Conseillers en assurance",
   "Courtiers",
   "Commerciaux indépendants",
   "Agences et cabinets",
   "Réseaux de vente",
-  "Entrepreneurs avec portefeuille client",
+  "Frontaliers avec portefeuille client",
+];
+const localSeoAreas = [
+  "Genève",
+  "Vaud",
+  "Lausanne",
+  "Nyon",
+  "Gex",
+  "Ferney-Voltaire",
+  "Pays de Gex",
+  "Zone frontalière franco-suisse",
 ];
 
 const plans = [
@@ -166,6 +184,43 @@ const plans = [
   ],
 ];
 
+function AnimatedNumber({
+  value,
+  suffix = "",
+}: {
+  value: number;
+  suffix?: string;
+}) {
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    let frame = 0;
+    const totalFrames = 45;
+
+    const interval = window.setInterval(() => {
+      frame += 1;
+
+      const progress = Math.min(frame / totalFrames, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+
+      setDisplay(Math.round(value * eased));
+
+      if (progress === 1) {
+        window.clearInterval(interval);
+      }
+    }, 28);
+
+    return () => window.clearInterval(interval);
+  }, [value]);
+
+  return (
+    <span>
+      {display}
+      {suffix}
+    </span>
+  );
+}
+
 export default function LandingPage() {
   const navigate = useNavigate();
 
@@ -178,16 +233,11 @@ export default function LandingPage() {
             onClick={() => navigate("/")}
             className="group flex shrink-0 items-center gap-3"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-500 to-cyan-400 text-white shadow-lg shadow-violet-200 transition group-hover:scale-105">
-              <Sparkles size={20} />
-            </div>
-
-            <div className="text-left">
-              <p className="text-lg font-black tracking-tight">MyPX</p>
-              <p className="text-xs font-medium text-slate-500">
-                Portfolio Intelligence
-              </p>
-            </div>
+            <img
+              src="/logo.svg"
+              alt="MyPX Portfolio Intelligence"
+              className="h-12 w-auto transition group-hover:scale-105"
+            />
           </button>
 
           <nav className="hidden items-center gap-7 text-sm font-bold text-slate-500 lg:flex">
@@ -265,32 +315,82 @@ export default function LandingPage() {
             </div>
 
             <h1 className="max-w-3xl text-5xl font-black leading-[0.95] tracking-tight sm:text-6xl lg:text-7xl">
-              Ton portefeuille client cache des opportunités.
+              Le CRM intelligent pour entrepreneurs, indépendants et
+              commerciaux.
             </h1>
 
             <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-              MyPX t’aide à savoir <strong>qui relancer</strong>,{" "}
-              <strong>pourquoi agir</strong>, <strong>quand contacter</strong>{" "}
-              et <strong>quel message envoyer</strong>. Ce n’est pas juste un
-              CRM : c’est ton centre de commandement pour animer, suivre et
-              convertir ton portefeuille client.
+              MyPX aide les professionnels à Genève, Vaud, Gex, Ferney-Voltaire
+              et en zone frontalière à mieux gérer leur portefeuille client. CRM
+              IA, relances intelligentes, carte de visite digitale, campagnes
+              email et PX Sentinel : tout est réuni pour savoir{" "}
+              <strong>qui relancer</strong>, <strong>pourquoi agir</strong>,{" "}
+              <strong>quand contacter</strong> et{" "}
+              <strong>quel message envoyer</strong>.
             </p>
 
-            <div className="mt-6 flex flex-wrap gap-3">
-              {[
-                "Dossiers clients",
-                "Relances IA",
-                "Campagnes email",
-                "Signaux commerciaux",
-              ].map((item) => (
-                <span
-                  key={item}
-                  className="rounded-full border border-white/70 bg-white/70 px-4 py-2 text-xs font-black text-slate-600 shadow-sm backdrop-blur-xl"
+            {[
+              {
+                label: "PX Sentinel actif",
+                icon: Radar,
+                glow: "from-violet-500 to-fuchsia-400",
+              },
+              {
+                label: "Relances intelligentes",
+                icon: Brain,
+                glow: "from-cyan-400 to-blue-400",
+              },
+              {
+                label: "Carte PX connectée",
+                icon: Smartphone,
+                glow: "from-amber-300 to-orange-300",
+              },
+              {
+                label: "Zone Genève • Vaud • Gex",
+                icon: MapPin,
+                glow: "from-emerald-400 to-cyan-300",
+              },
+              {
+                label: "Campagnes opérationnelles",
+                icon: Mail,
+                glow: "from-pink-400 to-violet-400",
+              },
+            ].map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <div
+                  key={item.label}
+                  className="group relative overflow-hidden rounded-2xl border border-white/70 bg-white/70 px-4 py-3 shadow-sm backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:shadow-xl"
                 >
-                  {item}
-                </span>
-              ))}
-            </div>
+                  <div
+                    className={`absolute inset-0 opacity-0 transition duration-500 group-hover:opacity-100 bg-gradient-to-r ${item.glow}`}
+                  />
+
+                  <div className="relative flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-white shadow-lg">
+                      <Icon size={16} />
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-violet-600">
+                        Module PX
+                      </p>
+
+                      <p className="text-sm font-black text-slate-800">
+                        {item.label}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="relative mt-3 h-1 overflow-hidden rounded-full bg-black/5">
+                    <div
+                      className={`h-full w-2/3 rounded-full bg-gradient-to-r ${item.glow}`}
+                    />
+                  </div>
+                </div>
+              );
+            })}
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button
@@ -334,7 +434,7 @@ export default function LandingPage() {
 
           {/* HERO CARD */}
           <div className="relative">
-            <div className="absolute -left-5 top-12 hidden rounded-3xl border border-white/70 bg-white/80 p-4 shadow-xl backdrop-blur-xl sm:block">
+            <div className="absolute -left-5 top-12 hidden animate-bounce rounded-3xl border border-white/70 bg-white/80 p-4 shadow-xl backdrop-blur-xl sm:block">
               <div className="flex items-center gap-3">
                 <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-700">
                   <Zap size={18} />
@@ -346,7 +446,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="absolute -right-3 bottom-16 hidden rounded-3xl border border-white/70 bg-white/80 p-4 shadow-xl backdrop-blur-xl sm:block">
+            <div className="absolute -right-3 bottom-16 hidden animate-pulse rounded-3xl border border-white/70 bg-white/80 p-4 shadow-xl backdrop-blur-xl sm:block">
               <div className="flex items-center gap-3">
                 <div className="rounded-2xl bg-violet-100 p-3 text-violet-700">
                   <Wand2 size={18} />
@@ -359,8 +459,11 @@ export default function LandingPage() {
             </div>
 
             <div className="rounded-[2.6rem] border border-white/80 bg-white/70 p-4 shadow-2xl shadow-violet-200/60 backdrop-blur-2xl">
-              <div className="rounded-[2.1rem] bg-slate-950 p-5 text-white shadow-inner">
-                <div className="flex items-center justify-between gap-4">
+              <div className="relative overflow-hidden rounded-[2.1rem] bg-slate-950 p-5 text-white shadow-inner">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.28),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(34,211,238,0.22),transparent_35%)]" />
+                <div className="absolute left-0 top-0 h-px w-full animate-pulse bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
+
+                <div className="relative flex items-center justify-between gap-4">
                   <div>
                     <p className="text-sm font-medium text-white/45">
                       Centre de commandement
@@ -368,24 +471,61 @@ export default function LandingPage() {
                     <h3 className="mt-1 text-2xl font-black">PX Sentinel</h3>
                   </div>
 
-                  <div className="rounded-2xl bg-white/10 p-3">
-                    <Brain size={23} />
+                  <div className="relative rounded-2xl bg-white/10 p-3">
+                    <span className="absolute inset-0 animate-ping rounded-2xl bg-cyan-300/20" />
+                    <Brain size={23} className="relative" />
                   </div>
                 </div>
 
-                <div className="mt-6 grid grid-cols-2 gap-3">
-                  {stats.map(([label, value]) => (
+                <div className="relative mt-6 grid grid-cols-2 gap-3">
+                  {stats.map(([label, value, suffix, Icon], index) => (
                     <div
                       key={label}
-                      className="rounded-3xl border border-white/10 bg-white/[0.06] p-4"
+                      className="group rounded-3xl border border-white/10 bg-white/[0.06] p-4 transition duration-300 hover:-translate-y-1 hover:bg-white/[0.1]"
+                      style={{
+                        animation: `floatCard 3.5s ease-in-out ${
+                          index * 0.25
+                        }s infinite`,
+                      }}
                     >
-                      <p className="text-sm text-white/45">{label}</p>
-                      <p className="mt-2 text-2xl font-black">{value}</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm text-white/45">{label}</p>
+                        <Icon size={17} className="text-cyan-200/70" />
+                      </div>
+
+                      <p className="mt-2 text-3xl font-black tracking-tight">
+                        <AnimatedNumber
+                          value={Number(value)}
+                          suffix={String(suffix)}
+                        />
+                      </p>
+
+                      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-violet-400 to-cyan-300"
+                          style={{
+                            width:
+                              label === "Dossiers suivis"
+                                ? "82%"
+                                : label === "Signaux IA"
+                                ? "58%"
+                                : label === "Opérations"
+                                ? "42%"
+                                : "76%",
+                          }}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-5 rounded-3xl bg-gradient-to-br from-amber-200 to-cyan-200 p-4 text-slate-950">
+                <div className="relative mt-5 rounded-3xl bg-gradient-to-br from-amber-200 to-cyan-200 p-4 text-slate-950 shadow-xl shadow-cyan-950/10">
+                  <div className="absolute right-4 top-4 flex gap-1">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-violet-500 delay-150" />
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-500 delay-300" />
+                  </div>
+
                   <div className="flex items-start gap-3">
                     <Sparkles size={21} className="mt-0.5 text-violet-700" />
                     <div>
@@ -400,25 +540,42 @@ export default function LandingPage() {
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-3xl bg-violet-50 p-4">
+                <div className="rounded-3xl bg-violet-50 p-4 transition hover:-translate-y-1">
                   <p className="text-sm font-bold text-slate-500">
                     Relations chaudes
                   </p>
-                  <p className="mt-2 text-3xl font-black">34</p>
+                  <p className="mt-2 text-3xl font-black">
+                    <AnimatedNumber value={34} />
+                  </p>
                 </div>
-                <div className="rounded-3xl bg-cyan-50 p-4">
+
+                <div className="rounded-3xl bg-cyan-50 p-4 transition hover:-translate-y-1">
                   <p className="text-sm font-bold text-slate-500">
                     Actions du jour
                   </p>
-                  <p className="mt-2 text-3xl font-black">9</p>
+                  <p className="mt-2 text-3xl font-black">
+                    <AnimatedNumber value={9} />
+                  </p>
                 </div>
               </div>
             </div>
+
+            <style>{`
+              @keyframes floatCard {
+                0%, 100% {
+                  transform: translateY(0px);
+                }
+                50% {
+                  transform: translateY(-5px);
+                }
+              }
+            `}</style>
           </div>
         </div>
       </section>
-            {/* WHY */}
-            <section id="why" className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
+
+      {/* WHY */}
+      <section id="why" className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
         <div className="max-w-3xl">
           <p className="text-sm font-black uppercase tracking-[0.24em] text-violet-600">
             Pourquoi utiliser MyPX ?

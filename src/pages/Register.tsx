@@ -1,4 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
+import type { ElementType, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertCircle,
@@ -17,6 +18,8 @@ import {
   Wand2,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+
+const APP_URL = "https://mypx.ch";
 
 export default function Register() {
   const [fullName, setFullName] = useState("");
@@ -43,18 +46,22 @@ export default function Register() {
     return "excellente";
   }, [passwordScore]);
 
-  const handleRegister = async (e: FormEvent) => {
+  const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setSuccess(false);
     setErrorMessage("");
 
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanFullName = fullName.trim();
+
     const { error } = await supabase.auth.signUp({
-      email: email.trim(),
+      email: cleanEmail,
       password,
       options: {
+        emailRedirectTo: `${APP_URL}/login`,
         data: {
-          full_name: fullName.trim(),
+          full_name: cleanFullName,
         },
       },
     });
@@ -67,6 +74,7 @@ export default function Register() {
     }
 
     setSuccess(true);
+    setPassword("");
   };
 
   return (
@@ -166,7 +174,7 @@ export default function Register() {
               <Notice
                 type="success"
                 title="Compte créé avec succès"
-                text="Vous pouvez maintenant vous connecter et lancer votre onboarding MyPX."
+                text="Un email de confirmation vient d’être envoyé. Cliquez sur le lien reçu pour activer votre compte, puis connectez-vous à MyPX."
               />
             ) : null}
 
@@ -226,6 +234,7 @@ export default function Register() {
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-transparent text-sm font-semibold text-slate-950 outline-none placeholder:text-slate-300"
                     required
+                    minLength={8}
                   />
 
                   <button
@@ -317,9 +326,9 @@ function FieldWrapper({
   label,
   children,
 }: {
-  icon: React.ElementType;
+  icon: ElementType;
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-violet-300 focus-within:ring-4 focus-within:ring-violet-100">
