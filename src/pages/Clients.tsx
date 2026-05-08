@@ -660,22 +660,162 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
   };
 
   const normalizeHeader = (value: string) =>
-    value
+    String(value || "")
       .toLowerCase()
+      .trim()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]/g, "");
-
+  
+  const FIELD_ALIASES: Record<keyof NewClientForm, string[]> = {
+    first_name: [
+      "prenom",
+      "prénom",
+      "first_name",
+      "firstname",
+      "first name",
+      "givenname",
+      "given name",
+    ],
+    last_name: [
+      "nom",
+      "last_name",
+      "lastname",
+      "last name",
+      "surname",
+      "familyname",
+      "family name",
+    ],
+    email: [
+      "email",
+      "mail",
+      "e-mail",
+      "adresse email",
+      "courriel",
+      "email address",
+    ],
+    phone: [
+      "telephone",
+      "téléphone",
+      "tel",
+      "phone",
+      "mobile",
+      "portable",
+      "numero",
+      "numéro",
+      "phone number",
+    ],
+    company: [
+      "societe",
+      "société",
+      "company",
+      "entreprise",
+      "business",
+      "organisation",
+      "organization",
+      "structure",
+    ],
+    city: [
+      "ville",
+      "city",
+      "localite",
+      "localité",
+      "commune",
+      "lieu",
+    ],
+    birthday: [
+      "anniversaire",
+      "birthday",
+      "date naissance",
+      "date de naissance",
+      "birthdate",
+      "birth date",
+    ],
+    group_name: [
+      "groupe",
+      "reseau",
+      "réseau",
+      "segment",
+      "categorie",
+      "catégorie",
+      "group",
+      "group_name",
+      "source",
+      "origine",
+    ],
+    status: [
+      "statut",
+      "status",
+      "etat",
+      "état",
+      "stage",
+      "pipeline",
+    ],
+    potential_amount: [
+      "potentiel",
+      "potential_amount",
+      "montant",
+      "valeur",
+      "budget",
+      "ca",
+      "chiffre affaire",
+      "chiffre d affaire",
+      "amount",
+      "value",
+    ],
+    notes: [
+      "notes",
+      "note",
+      "commentaire",
+      "commentaires",
+      "renseignements",
+      "description",
+      "memo",
+      "message",
+      "details",
+      "détails",
+    ],
+  };
+  
   const getFieldValue = (
     row: Record<string, string>,
-    possibleNames: string[]
+    field: keyof NewClientForm
   ) => {
-    for (const name of possibleNames) {
-      const found = row[normalizeHeader(name)];
-      if (found) return found;
+    const aliases = FIELD_ALIASES[field] || [];
+  
+    for (const alias of aliases) {
+      const normalizedAlias = normalizeHeader(alias);
+      const found = row[normalizedAlias];
+  
+      if (found && String(found).trim()) {
+        return String(found).trim();
+      }
     }
-
+  
     return "";
+  };
+  
+  const cleanPotentialAmount = (value: string) => {
+    if (!value) return "";
+  
+    const cleaned = String(value)
+      .replace(/[^\d,.-]/g, "")
+      .replace(",", ".");
+  
+    const number = Number(cleaned);
+  
+    return Number.isFinite(number) ? String(number) : "";
+  };
+  
+  const cleanStatus = (value: string) => {
+    const normalized = normalizeHeader(value);
+  
+    if (["client", "relationactive", "actif"].includes(normalized)) return "client";
+    if (["chaud", "hot", "urgent"].includes(normalized)) return "chaud";
+    if (["arelancer", "relance", "relancer", "suivi"].includes(normalized))
+      return "a_relancer";
+  
+    return "prospect";
   };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -708,49 +848,19 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       const row: ImportClientRow = {
         id: `${Date.now()}-${index}`,
         selected: true,
-        first_name: getFieldValue(rawRow, [
-          "prenom",
-          "prénom",
-          "first_name",
-          "firstname",
-        ]),
-        last_name: getFieldValue(rawRow, ["nom", "last_name", "lastname"]),
-        email: getFieldValue(rawRow, ["email", "mail", "adresse email"]),
-        phone: getFieldValue(rawRow, [
-          "telephone",
-          "téléphone",
-          "phone",
-          "mobile",
-        ]),
-        company: getFieldValue(rawRow, [
-          "societe",
-          "société",
-          "company",
-          "entreprise",
-        ]),
-        city: getFieldValue(rawRow, ["ville", "city"]),
-        birthday: getFieldValue(rawRow, [
-          "anniversaire",
-          "birthday",
-          "date naissance",
-        ]),
-        group_name: getFieldValue(rawRow, [
-          "groupe",
-          "reseau",
-          "réseau",
-          "group_name",
-        ]),
-        status: getFieldValue(rawRow, ["statut", "status"]) || "prospect",
-        potential_amount: getFieldValue(rawRow, [
-          "potentiel",
-          "potential_amount",
-          "montant",
-        ]),
-        notes: getFieldValue(rawRow, [
-          "notes",
-          "commentaire",
-          "renseignements",
-        ]),
+        first_name: getFieldValue(rawRow, "first_name"),
+        last_name: getFieldValue(rawRow, "last_name"),
+        email: getFieldValue(rawRow, "email").toLowerCase(),
+        phone: getFieldValue(rawRow, "phone"),
+        company: getFieldValue(rawRow, "company"),
+        city: getFieldValue(rawRow, "city"),
+        birthday: getFieldValue(rawRow, "birthday"),
+        group_name: getFieldValue(rawRow, "group_name"),
+        status: cleanStatus(getFieldValue(rawRow, "status")),
+        potential_amount: cleanPotentialAmount(
+          getFieldValue(rawRow, "potential_amount")
+        ),
+        notes: getFieldValue(rawRow, "notes"),
         errors: [],
       };
 
@@ -816,7 +926,9 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       birthday: row.birthday || null,
       group_name: row.group_name || null,
       status: row.status || "prospect",
-      potential_amount: row.potential_amount ? Number(row.potential_amount) : 0,
+      potential_amount: row.potential_amount
+  ? Number(cleanPotentialAmount(row.potential_amount))
+  : 0,
       notes: row.notes || null,
       last_contact_at: null,
       score: 0,

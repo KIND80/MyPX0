@@ -14,6 +14,9 @@ import {
   Mail,
   Radio,
   Sparkles,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -120,6 +123,7 @@ const buildEmailSignature = (onboarding: UserOnboarding | null) => {
             ? `<img src="${escapeHtml(advisorPhotoUrl)}" alt="Photo conseiller" style="width:54px;height:54px;border-radius:14px;object-fit:cover;" />`
             : ""
         }
+
         <div style="min-width:180px;">
           ${
             advisorName
@@ -128,6 +132,7 @@ const buildEmailSignature = (onboarding: UserOnboarding | null) => {
                 )}</div>`
               : ""
           }
+
           ${
             advisorRole
               ? `<div style="font-size:13px;color:#6b7280;margin-top:2px;">${escapeHtml(
@@ -135,6 +140,7 @@ const buildEmailSignature = (onboarding: UserOnboarding | null) => {
                 )}</div>`
               : ""
           }
+
           ${
             companyName
               ? `<div style="font-size:13px;font-weight:600;margin-top:6px;">${escapeHtml(
@@ -142,6 +148,7 @@ const buildEmailSignature = (onboarding: UserOnboarding | null) => {
                 )}</div>`
               : ""
           }
+
           ${
             companyAddress
               ? `<div style="font-size:12px;color:#6b7280;margin-top:2px;">${escapeHtml(
@@ -149,6 +156,7 @@ const buildEmailSignature = (onboarding: UserOnboarding | null) => {
                 )}</div>`
               : ""
           }
+
           <div style="font-size:12px;color:#6b7280;margin-top:8px;line-height:1.6;">
             ${companyPhone ? `📞 ${escapeHtml(companyPhone)}<br />` : ""}
             ${companyEmail ? `✉️ ${escapeHtml(companyEmail)}<br />` : ""}
@@ -162,6 +170,7 @@ const buildEmailSignature = (onboarding: UserOnboarding | null) => {
                 : ""
             }
           </div>
+
           <div style="margin-top:10px;">
             ${
               whatsappUrl
@@ -170,6 +179,7 @@ const buildEmailSignature = (onboarding: UserOnboarding | null) => {
                   )}" style="display:inline-block;margin-right:8px;background:#22c55e;color:#fff;text-decoration:none;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;">WhatsApp</a>`
                 : ""
             }
+
             ${
               bookingUrl
                 ? `<a href="${escapeHtml(
@@ -181,6 +191,7 @@ const buildEmailSignature = (onboarding: UserOnboarding | null) => {
             }
           </div>
         </div>
+
         ${
           logoUrl
             ? `<div style="margin-left:auto;"><img src="${escapeHtml(
@@ -198,12 +209,14 @@ export default function Inbox({ session }: Props) {
   const [loading, setLoading] = useState(true);
   const [selectedEmail, setSelectedEmail] = useState<InboundEmail | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [onboarding, setOnboarding] = useState<UserOnboarding | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyContent, setReplyContent] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
+  const [deletingEmailId, setDeletingEmailId] = useState<string | null>(null);
 
   const loadOnboarding = async () => {
     const { data } = await supabase
@@ -220,6 +233,7 @@ export default function Inbox({ session }: Props) {
   const loadEmails = async () => {
     setLoading(true);
     setErrorMessage("");
+    setSuccessMessage("");
 
     const { data: inboundData, error: inboundError } = await supabase
       .from("inbound_emails")
@@ -281,6 +295,9 @@ export default function Inbox({ session }: Props) {
   };
 
   const markAsRead = async (emailId: string) => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
     const { error } = await supabase
       .from("inbound_emails")
       .update({ status: "read" })
@@ -288,7 +305,7 @@ export default function Inbox({ session }: Props) {
       .eq("user_id", session.user.id);
 
     if (error) {
-      alert(error.message);
+      setErrorMessage(error.message);
       return;
     }
 
@@ -301,20 +318,68 @@ export default function Inbox({ session }: Props) {
     setSelectedEmail((prev) =>
       prev?.id === emailId ? { ...prev, status: "read" } : prev
     );
+
+    setSuccessMessage("Transmission marquée comme lue.");
+  };
+
+  const handleDeleteEmail = async (emailId: string) => {
+    const emailToDelete = emails.find((email) => email.id === emailId);
+
+    const confirmed = window.confirm(
+      `Supprimer définitivement cette transmission ?\n\n${
+        emailToDelete?.subject || "Sans objet"
+      }`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingEmailId(emailId);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    const { error } = await supabase
+      .from("inbound_emails")
+      .delete()
+      .eq("id", emailId)
+      .eq("user_id", session.user.id);
+
+    if (error) {
+      setDeletingEmailId(null);
+      setErrorMessage(error.message);
+      return;
+    }
+
+    setEmails((prev) => {
+      const nextEmails = prev.filter((email) => email.id !== emailId);
+
+      setSelectedEmail((current) => {
+        if (current?.id !== emailId) return current;
+        return nextEmails[0] || null;
+      });
+
+      return nextEmails;
+    });
+
+    setReplyOpen(false);
+    setReplyContent("");
+    setDeletingEmailId(null);
+    setSuccessMessage("Transmission supprimée.");
   };
 
   const sendReply = async () => {
     if (!selectedEmail?.from_email) {
-      alert("Adresse email expéditeur introuvable.");
+      setErrorMessage("Adresse email expéditeur introuvable.");
       return;
     }
 
     if (!replyContent.trim()) {
-      alert("Écris une réponse avant d’envoyer.");
+      setErrorMessage("Écris une réponse avant d’envoyer.");
       return;
     }
 
     setSendingReply(true);
+    setErrorMessage("");
+    setSuccessMessage("");
 
     const subject = selectedEmail.subject?.toLowerCase().startsWith("re:")
       ? selectedEmail.subject
@@ -360,7 +425,7 @@ export default function Inbox({ session }: Props) {
     });
 
     if (error || data?.success === false) {
-      alert("Réponse non envoyée. Vérifie la fonction send-email.");
+      setErrorMessage("Réponse non envoyée. Vérifie la fonction send-email.");
       setSendingReply(false);
       return;
     }
@@ -372,6 +437,7 @@ export default function Inbox({ session }: Props) {
     setReplyContent("");
     setReplyOpen(false);
     setSendingReply(false);
+    setSuccessMessage("Réponse envoyée avec succès.");
     await loadEmails();
   };
 
@@ -384,6 +450,8 @@ export default function Inbox({ session }: Props) {
     () => emails.filter((email) => email.status !== "read").length,
     [emails]
   );
+
+  const totalCount = emails.length;
 
   const getClientName = (email: InboundEmail) => {
     const clientName = `${email.client?.first_name || ""} ${
@@ -442,7 +510,8 @@ export default function Inbox({ session }: Props) {
 
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-400">
               PX Sentinel centralise les réponses entrantes, détecte les
-              messages non lus et te permet de répondre avec ta signature MyPX.
+              messages non lus, permet de répondre et de nettoyer les
+              transmissions inutiles.
             </p>
           </div>
 
@@ -455,17 +524,43 @@ export default function Inbox({ session }: Props) {
               Scanner
             </button>
 
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center sm:px-5">
+              <p className="text-2xl font-black text-white sm:text-3xl">
+                {totalCount}
+              </p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 sm:text-xs">
+                transmissions
+              </p>
+            </div>
+
             <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-center sm:px-5">
               <p className="text-2xl font-black text-rose-100 sm:text-3xl">
                 {unreadCount}
               </p>
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-rose-200/60 sm:text-xs">
-                signaux non lus
+                non lus
               </p>
             </div>
           </div>
         </div>
       </div>
+
+      {(errorMessage || successMessage) && (
+        <div
+          className={`flex items-start gap-3 rounded-[1.4rem] border p-4 text-sm font-bold ${
+            errorMessage
+              ? "border-rose-400/20 bg-rose-500/10 text-rose-200"
+              : "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
+          }`}
+        >
+          {errorMessage ? (
+            <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+          ) : (
+            <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+          )}
+          <span>{errorMessage || successMessage}</span>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex min-h-[360px] items-center justify-center rounded-[2rem] border border-white/10 bg-white/[0.04] shadow-sm">
@@ -475,10 +570,6 @@ export default function Inbox({ session }: Props) {
               PX Sentinel analyse les transmissions...
             </p>
           </div>
-        </div>
-      ) : errorMessage ? (
-        <div className="rounded-[1.75rem] border border-rose-400/20 bg-rose-500/10 p-5 text-sm font-bold text-rose-200">
-          Erreur Inbox : {errorMessage}
         </div>
       ) : emails.length === 0 ? (
         <div className="rounded-[1.75rem] border border-dashed border-white/10 bg-white/[0.04] p-8 text-center shadow-sm sm:p-10">
@@ -519,50 +610,70 @@ export default function Inbox({ session }: Props) {
                 filteredEmails.map((email) => {
                   const isSelected = selectedEmail?.id === email.id;
                   const isUnread = email.status !== "read";
+                  const isDeleting = deletingEmailId === email.id;
 
                   return (
-                    <button
+                    <div
                       key={email.id}
-                      onClick={() => {
-                        setSelectedEmail(email);
-                        setReplyOpen(false);
-                        setReplyContent("");
-                      }}
-                      className={`w-full rounded-[1.35rem] border p-4 text-left transition active:scale-[0.99] ${
+                      className={`group relative rounded-[1.35rem] border transition ${
                         isSelected
                           ? "border-violet-400/40 bg-violet-600/20 text-white shadow-xl shadow-violet-950/20"
                           : "border-white/10 bg-[#121A2F]/80 text-white shadow-sm hover:border-violet-400/30 hover:bg-[#18213a]"
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-black">
-                            {getClientName(email)}
-                          </p>
-                          <p className="mt-1 truncate text-xs font-semibold text-slate-500">
-                            {email.from_email}
-                          </p>
+                      <button
+                        onClick={() => {
+                          setSelectedEmail(email);
+                          setReplyOpen(false);
+                          setReplyContent("");
+                          setSuccessMessage("");
+                          setErrorMessage("");
+                        }}
+                        className="w-full p-4 text-left active:scale-[0.99]"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black">
+                              {getClientName(email)}
+                            </p>
+                            <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                              {email.from_email}
+                            </p>
+                          </div>
+
+                          {isUnread && (
+                            <span className="shrink-0 rounded-full bg-rose-500 px-2 py-1 text-[9px] font-black uppercase text-white">
+                              Signal
+                            </span>
+                          )}
                         </div>
 
-                        {isUnread && (
-                          <span className="shrink-0 rounded-full bg-rose-500 px-2 py-1 text-[9px] font-black uppercase text-white">
-                            Signal
-                          </span>
+                        <p className="mt-3 line-clamp-1 text-sm font-black">
+                          {email.subject || "Sans objet"}
+                        </p>
+
+                        <p className="mt-2 line-clamp-2 text-xs font-semibold leading-5 text-slate-400">
+                          {getEmailPreview(email)}
+                        </p>
+
+                        <p className="mt-3 text-[11px] font-bold text-slate-500">
+                          {new Date(email.created_at).toLocaleString("fr-FR")}
+                        </p>
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteEmail(email.id)}
+                        disabled={isDeleting}
+                        className="absolute bottom-3 right-3 inline-flex items-center justify-center rounded-xl border border-rose-400/20 bg-rose-500/10 p-2 text-rose-200 opacity-100 transition hover:bg-rose-500/20 disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100"
+                        title="Supprimer"
+                      >
+                        {isDeleting ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={14} />
                         )}
-                      </div>
-
-                      <p className="mt-3 line-clamp-1 text-sm font-black">
-                        {email.subject || "Sans objet"}
-                      </p>
-
-                      <p className="mt-2 line-clamp-2 text-xs font-semibold leading-5 text-slate-400">
-                        {getEmailPreview(email)}
-                      </p>
-
-                      <p className="mt-3 text-[11px] font-bold text-slate-500">
-                        {new Date(email.created_at).toLocaleString("fr-FR")}
-                      </p>
-                    </button>
+                      </button>
+                    </div>
                   );
                 })
               )}
@@ -605,7 +716,7 @@ export default function Inbox({ session }: Props) {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:justify-end">
                     {selectedEmail.status !== "read" && (
                       <button
                         onClick={() => markAsRead(selectedEmail.id)}
@@ -626,13 +737,26 @@ export default function Inbox({ session }: Props) {
 
                     {selectedEmail.client_id && (
                       <a
-                        href={`/dashboard?client=${selectedEmail.client_id}`}
+                        href={`/dashboard?view=clients&client_id=${selectedEmail.client_id}`}
                         className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black text-slate-200 transition hover:bg-white/10 active:scale-[0.98]"
                       >
                         <ExternalLink size={15} />
                         Ouvrir dossier
                       </a>
                     )}
+
+                    <button
+                      onClick={() => handleDeleteEmail(selectedEmail.id)}
+                      disabled={deletingEmailId === selectedEmail.id}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-xs font-black text-rose-100 transition hover:bg-rose-500/20 active:scale-[0.98] disabled:opacity-60"
+                    >
+                      {deletingEmailId === selectedEmail.id ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={15} />
+                      )}
+                      Supprimer
+                    </button>
                   </div>
                 </div>
 
