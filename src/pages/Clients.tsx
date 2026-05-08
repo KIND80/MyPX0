@@ -2,11 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import type React from "react";
 import { Session } from "@supabase/supabase-js";
 import {
+  AlertTriangle,
   Bot,
   Building2,
   CalendarDays,
+  CheckCircle2,
   Download,
   Euro,
+  FileSpreadsheet,
   Flame,
   Loader2,
   Mail,
@@ -16,6 +19,7 @@ import {
   Search,
   Sparkles,
   Trash2,
+  Upload,
   UserPlus,
   Users,
   Wand2,
@@ -67,6 +71,12 @@ type NewClientForm = {
   status: string;
   potential_amount: string;
   notes: string;
+};
+
+type ImportClientRow = NewClientForm & {
+  id: string;
+  selected: boolean;
+  errors: string[];
 };
 
 type WelcomeTemplate = {
@@ -200,7 +210,9 @@ const enrichClientWithAI = async ({
 };
 
 const csvEscape = (value: string | number | null | undefined) => {
-  const cleanValue = String(value ?? "").split('"').join('""');
+  const cleanValue = String(value ?? "")
+    .split('"')
+    .join('""');
   return `"${cleanValue}"`;
 };
 
@@ -211,6 +223,12 @@ export default function Clients({ session }: ClientsProps) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [scoreFilter, setScoreFilter] = useState("all");
   const [showModal, setShowModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importRows, setImportRows] = useState<ImportClientRow[]>([]);
+  const [importFileName, setImportFileName] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [prepareQueuedEmails, setPrepareQueuedEmails] = useState(false);
+  const [queueDelayMinutes, setQueueDelayMinutes] = useState("2");
   const [form, setForm] = useState<NewClientForm>(initialForm);
   const [loading, setLoading] = useState(false);
   const [loadingClients, setLoadingClients] = useState(true);
@@ -534,6 +552,345 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
         .eq("user_id", session.user.id);
     }
   };
+  const buildWelcomeEmailForQueue = async (insertedClient: Client) => {
+    const { data: welcomeTemplate, error: templateError } = await supabase
+      .from("email_templates")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .eq("type", "welcome_email")
+      .eq("is_active", true)
+      .maybeSingle();
+
+    let renderedSubject = "";
+    let renderedContent = "";
+    let templateType = "welcome_email";
+
+    if (!templateError && welcomeTemplate) {
+      const template = welcomeTemplate as WelcomeTemplate;
+
+      renderedSubject = renderVariables(template.subject || "", insertedClient);
+      renderedContent = renderVariables(template.content || "", insertedClient);
+    } else {
+      templateType = "welcome_email_fallback";
+      renderedSubject = `Bienvenue ${insertedClient.first_name || ""}`.trim();
+
+      renderedContent = `
+  Bonjour ${insertedClient.first_name || ""},
+  
+  Ravi de vous compter parmi nos contacts.
+  
+  Vous pouvez simplement répondre à cet email si vous souhaitez échanger ou préciser votre besoin.
+  
+  À bientôt,
+  ${settings?.advisor_name || settings?.company_name || "MyPX"}
+  ${settings?.company_phone || ""}
+  ${settings?.company_website || ""}
+  `.trim();
+    }
+
+    if (!renderedSubject) {
+      renderedSubject = `Bienvenue ${insertedClient.first_name || ""}`.trim();
+    }
+
+    if (!renderedContent) {
+      renderedContent = `
+  Bonjour ${insertedClient.first_name || ""},
+  
+  Ravi de vous compter parmi nos contacts.
+  
+  À bientôt,
+  ${settings?.advisor_name || settings?.company_name || "MyPX"}
+  `.trim();
+    }
+
+    return {
+      templateType,
+      subject: renderedSubject,
+      content: renderedContent,
+    };
+  };
+  const isValidEmail = (email: string) =>
+    !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const validateImportRow = (row: ImportClientRow) => {
+    const errors: string[] = [];
+
+    const hasIdentity =
+      row.first_name || row.last_name || row.email || row.phone || row.company;
+
+    if (!hasIdentity) errors.push("Ligne vide");
+    if (row.email && !isValidEmail(row.email)) errors.push("Email invalide");
+
+    const alreadyExists = clients.some(
+      (client) =>
+        client.email &&
+        row.email &&
+        client.email.toLowerCase() === row.email.toLowerCase()
+    );
+
+    if (alreadyExists) errors.push("Email déjà présent");
+
+    return errors;
+  };
+
+  const parseCsvLine = (line: string) => {
+    const result: string[] = [];
+    let current = "";
+    let insideQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const next = line[i + 1];
+
+      if (char === '"' && insideQuotes && next === '"') {
+        current += '"';
+        i++;
+      } else if (char === '"') {
+        insideQuotes = !insideQuotes;
+      } else if ((char === ";" || char === ",") && !insideQuotes) {
+        result.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+
+    result.push(current.trim());
+    return result;
+  };
+
+  const normalizeHeader = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, "");
+
+  const getFieldValue = (
+    row: Record<string, string>,
+    possibleNames: string[]
+  ) => {
+    for (const name of possibleNames) {
+      const found = row[normalizeHeader(name)];
+      if (found) return found;
+    }
+
+    return "";
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+
+    const text = await file.text();
+    const lines = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (lines.length < 2) {
+      alert("Le fichier semble vide ou incomplet.");
+      return;
+    }
+
+    const headers = parseCsvLine(lines[0]).map(normalizeHeader);
+
+    const rows = lines.slice(1).map((line, index) => {
+      const values = parseCsvLine(line);
+      const rawRow: Record<string, string> = {};
+
+      headers.forEach((header, i) => {
+        rawRow[header] = values[i] || "";
+      });
+
+      const row: ImportClientRow = {
+        id: `${Date.now()}-${index}`,
+        selected: true,
+        first_name: getFieldValue(rawRow, [
+          "prenom",
+          "prénom",
+          "first_name",
+          "firstname",
+        ]),
+        last_name: getFieldValue(rawRow, ["nom", "last_name", "lastname"]),
+        email: getFieldValue(rawRow, ["email", "mail", "adresse email"]),
+        phone: getFieldValue(rawRow, [
+          "telephone",
+          "téléphone",
+          "phone",
+          "mobile",
+        ]),
+        company: getFieldValue(rawRow, [
+          "societe",
+          "société",
+          "company",
+          "entreprise",
+        ]),
+        city: getFieldValue(rawRow, ["ville", "city"]),
+        birthday: getFieldValue(rawRow, [
+          "anniversaire",
+          "birthday",
+          "date naissance",
+        ]),
+        group_name: getFieldValue(rawRow, [
+          "groupe",
+          "reseau",
+          "réseau",
+          "group_name",
+        ]),
+        status: getFieldValue(rawRow, ["statut", "status"]) || "prospect",
+        potential_amount: getFieldValue(rawRow, [
+          "potentiel",
+          "potential_amount",
+          "montant",
+        ]),
+        notes: getFieldValue(rawRow, [
+          "notes",
+          "commentaire",
+          "renseignements",
+        ]),
+        errors: [],
+      };
+
+      row.errors = validateImportRow(row);
+      row.selected = row.errors.length === 0;
+
+      return row;
+    });
+
+    setImportRows(rows);
+  };
+
+  const updateImportRow = (
+    id: string,
+    field: keyof NewClientForm,
+    value: string
+  ) => {
+    setImportRows((prev) =>
+      prev.map((row) => {
+        if (row.id !== id) return row;
+
+        const updated = {
+          ...row,
+          [field]: value,
+        };
+
+        return {
+          ...updated,
+          errors: validateImportRow(updated),
+        };
+      })
+    );
+  };
+
+  const toggleImportRow = (id: string) => {
+    setImportRows((prev) =>
+      prev.map((row) =>
+        row.id === id ? { ...row, selected: !row.selected } : row
+      )
+    );
+  };
+
+  const handleConfirmImport = async () => {
+    const rowsToImport = importRows.filter(
+      (row) => row.selected && row.errors.length === 0
+    );
+
+    if (rowsToImport.length === 0) {
+      alert("Aucune ligne valide sélectionnée.");
+      return;
+    }
+
+    setImporting(true);
+
+    const payload = rowsToImport.map((row) => ({
+      user_id: session.user.id,
+      first_name: row.first_name || null,
+      last_name: row.last_name || null,
+      email: row.email || null,
+      phone: row.phone || null,
+      company: row.company || null,
+      city: row.city || null,
+      birthday: row.birthday || null,
+      group_name: row.group_name || null,
+      status: row.status || "prospect",
+      potential_amount: row.potential_amount ? Number(row.potential_amount) : 0,
+      notes: row.notes || null,
+      last_contact_at: null,
+      score: 0,
+      public_enrichment_status: "pending",
+    }));
+
+    const { data: insertedClients, error } = await supabase
+      .from("clients")
+      .insert(payload)
+      .select();
+
+    if (error) {
+      setImporting(false);
+      alert(error.message);
+      return;
+    }
+
+    if (prepareQueuedEmails && insertedClients?.length) {
+      const delay = Math.max(Number(queueDelayMinutes || 2), 1);
+      const clientsWithEmail = (insertedClients as Client[]).filter(
+        (client) => client.email
+      );
+
+      const queueRows = await Promise.all(
+        clientsWithEmail.map(async (client, index) => {
+          const emailContent = await buildWelcomeEmailForQueue(client);
+
+          const scheduledAt = new Date(
+            Date.now() + index * delay * 60 * 1000
+          ).toISOString();
+
+          return {
+            user_id: session.user.id,
+            client_id: client.id,
+            template_type: emailContent.templateType,
+            recipient_email: client.email as string,
+            subject: emailContent.subject,
+            content: emailContent.content,
+            status: "pending",
+            scheduled_at: scheduledAt,
+          };
+        })
+      );
+
+      if (queueRows.length > 0) {
+        const { error: queueError } = await supabase
+          .from("email_queue")
+          .insert(queueRows);
+
+        if (queueError) {
+          setImporting(false);
+          alert(
+            `Les clients ont été importés, mais la file email n’a pas été créée : ${queueError.message}`
+          );
+          fetchClients();
+          return;
+        }
+      }
+    }
+
+    setImporting(false);
+    setShowImportModal(false);
+    setImportRows([]);
+    setImportFileName("");
+    setPrepareQueuedEmails(false);
+    setQueueDelayMinutes("2");
+    fetchClients();
+
+    alert(
+      prepareQueuedEmails
+        ? "Import terminé. Les emails de bienvenue ont été préparés dans la file Sentinel."
+        : "Import terminé. Aucun email automatique n’a été préparé."
+    );
+  };
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -627,6 +984,14 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
             >
               <Download size={16} />
               Exporter les dossiers
+            </button>
+
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="inline-flex items-center gap-2 rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-100 shadow-sm transition hover:-translate-y-0.5 hover:bg-cyan-400/15"
+            >
+              <Upload size={16} />
+              Import Sentinel
             </button>
 
             <button
@@ -827,6 +1192,230 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
           </>
         )}
       </div>
+
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-[2rem] border border-white/75 bg-white/95 p-5 shadow-2xl shadow-cyan-300/40 backdrop-blur-2xl sm:p-6">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-cyan-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-cyan-700">
+                  <FileSpreadsheet size={14} />
+                  Import Sentinel
+                </div>
+
+                <h3 className="mt-3 text-2xl font-black text-slate-950">
+                  Importer des contacts en masse
+                </h3>
+
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                  PX Sentinel lit ton fichier, prépare un tableau de contrôle et
+                  te laisse valider chaque fiche avant création. Aucun email
+                  n’est envoyé automatiquement.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="rounded-2xl border border-slate-200 bg-white p-3 text-slate-500 transition hover:text-slate-950"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <label className="mb-5 flex cursor-pointer flex-col items-center justify-center rounded-[1.5rem] border-2 border-dashed border-cyan-200 bg-cyan-50/70 p-6 text-center transition hover:bg-cyan-50">
+              <Upload className="mb-3 h-8 w-8 text-cyan-700" />
+              <span className="text-sm font-black text-slate-950">
+                Déposer un fichier CSV
+              </span>
+              <span className="mt-1 text-xs text-slate-500">
+                Colonnes acceptées : prénom, nom, email, téléphone, société,
+                ville, groupe, statut, potentiel, notes.
+              </span>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleImportFile}
+                className="hidden"
+              />
+            </label>
+
+            {importFileName && (
+              <div className="mb-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600">
+                Fichier chargé : {importFileName}
+              </div>
+            )}
+
+            {importRows.length > 0 && (
+              <>
+                <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <MiniStat
+                    icon={<Users size={18} />}
+                    label="Lignes détectées"
+                    value={importRows.length}
+                    tone="slate"
+                  />
+                  <MiniStat
+                    icon={<CheckCircle2 size={18} />}
+                    label="Lignes valides"
+                    value={
+                      importRows.filter((row) => row.errors.length === 0).length
+                    }
+                    tone="cyan"
+                  />
+                  <MiniStat
+                    icon={<AlertTriangle size={18} />}
+                    label="À vérifier"
+                    value={
+                      importRows.filter((row) => row.errors.length > 0).length
+                    }
+                    tone="orange"
+                  />
+                </div>
+
+                <div className="overflow-x-auto rounded-[1.5rem] border border-slate-200 bg-white">
+                  <table className="min-w-[1200px] text-left text-xs text-slate-600">
+                    <thead className="bg-slate-50 text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                      <tr>
+                        <th className="px-3 py-3">OK</th>
+                        <th className="px-3 py-3">Prénom</th>
+                        <th className="px-3 py-3">Nom</th>
+                        <th className="px-3 py-3">Email</th>
+                        <th className="px-3 py-3">Téléphone</th>
+                        <th className="px-3 py-3">Société</th>
+                        <th className="px-3 py-3">Ville</th>
+                        <th className="px-3 py-3">Groupe</th>
+                        <th className="px-3 py-3">Statut</th>
+                        <th className="px-3 py-3">Potentiel</th>
+                        <th className="px-3 py-3">Contrôle Sentinel</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {importRows.map((row) => (
+                        <tr key={row.id} className="border-t border-slate-100">
+                          <td className="px-3 py-3">
+                            <input
+                              type="checkbox"
+                              checked={row.selected}
+                              disabled={row.errors.length > 0}
+                              onChange={() => toggleImportRow(row.id)}
+                            />
+                          </td>
+
+                          {[
+                            "first_name",
+                            "last_name",
+                            "email",
+                            "phone",
+                            "company",
+                            "city",
+                            "group_name",
+                            "status",
+                            "potential_amount",
+                          ].map((field) => (
+                            <td key={field} className="px-3 py-3">
+                              <input
+                                value={row[field as keyof NewClientForm]}
+                                onChange={(e) =>
+                                  updateImportRow(
+                                    row.id,
+                                    field as keyof NewClientForm,
+                                    e.target.value
+                                  )
+                                }
+                                className="w-full min-w-[120px] rounded-xl border border-slate-200 px-3 py-2 font-semibold outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+                              />
+                            </td>
+                          ))}
+
+                          <td className="px-3 py-3">
+                            {row.errors.length === 0 ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 font-black text-emerald-700">
+                                <CheckCircle2 size={13} />
+                                Validé
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-3 py-1 font-black text-orange-700">
+                                <AlertTriangle size={13} />
+                                {row.errors.join(", ")}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-5 rounded-[1.4rem] border border-violet-100 bg-violet-50 p-4">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <p className="text-sm font-black text-slate-950">
+                        Sécurité PX Sentinel
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        Les fiches sont importées sans envoi brutal. Si tu
+                        actives la file d’attente, les emails seront préparés
+                        avec un délai entre chaque envoi.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-violet-100 bg-white px-4 py-3 text-xs font-black text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={prepareQueuedEmails}
+                          onChange={(e) =>
+                            setPrepareQueuedEmails(e.target.checked)
+                          }
+                        />
+                        Préparer les emails en file Sentinel
+                      </label>
+
+                      <div className="flex items-center gap-2 rounded-2xl border border-violet-100 bg-white px-4 py-3">
+                        <span className="text-xs font-black text-slate-500">
+                          1 email toutes les
+                        </span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={queueDelayMinutes}
+                          onChange={(e) => setQueueDelayMinutes(e.target.value)}
+                          disabled={!prepareQueuedEmails}
+                          className="w-16 bg-transparent text-center text-sm font-black text-slate-950 outline-none disabled:opacity-40"
+                        />
+                        <span className="text-xs font-black text-slate-500">
+                          min
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={handleConfirmImport}
+                      disabled={importing}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {importing ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Import Sentinel...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 size={16} />
+                          Importer les lignes validées
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
@@ -1066,7 +1655,9 @@ function StatusBadge({ value }: { value: string }) {
     : "border-slate-100 bg-slate-50 text-slate-600";
 
   return (
-    <span className={`rounded-full border px-3 py-1 text-xs font-black ${classes}`}>
+    <span
+      className={`rounded-full border px-3 py-1 text-xs font-black ${classes}`}
+    >
       {value}
     </span>
   );
