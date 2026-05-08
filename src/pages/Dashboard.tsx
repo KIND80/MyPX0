@@ -13,16 +13,20 @@ import {
   Bell,
   Bot,
   Cake,
+  CheckCircle2,
   CircleAlert,
   Clock3,
   Flame,
   Inbox as InboxIcon,
   LayoutDashboard,
+  Loader2,
   LogOut,
   Mail,
   Megaphone,
   Plus,
   Radar,
+  RefreshCw,
+  Send,
   Settings as SettingsIcon,
   Sparkles,
   Star,
@@ -71,6 +75,18 @@ type CampaignRow = {
   status: string | null;
 };
 
+type EmailQueueRow = {
+  id: string;
+  client_id: string | null;
+  recipient_email: string;
+  subject: string | null;
+  status: string | null;
+  scheduled_at: string | null;
+  sent_at: string | null;
+  error_message: string | null;
+  created_at: string;
+};
+
 const onboardingSteps = [
   {
     title: "Active ton identité relationnelle",
@@ -114,7 +130,8 @@ function getInitialView(): ActiveView {
     view === "inbox" ||
     view === "campaigns" ||
     view === "welcome" ||
-    view === "email_logs"
+    view === "email_logs" ||
+    view === "email_queue"
   ) {
     return "email_hub";
   }
@@ -202,6 +219,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const [followUps, setFollowUps] = useState<FollowUpRow[]>([]);
   const [, setCampaigns] = useState<CampaignRow[]>([]);
   const [unreadEmails, setUnreadEmails] = useState(0);
+  const [queuePendingCount, setQueuePendingCount] = useState(0);
   const [loadingStats, setLoadingStats] = useState(true);
 
   const userName = useMemo(() => {
@@ -241,7 +259,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const fetchDashboardData = async () => {
     setLoadingStats(true);
 
-    const [clientsRes, followUpsRes, campaignsRes, inboxRes] =
+    const [clientsRes, followUpsRes, campaignsRes, inboxRes, queueRes] =
       await Promise.all([
         supabase
           .from("clients")
@@ -268,6 +286,12 @@ export default function Dashboard({ session }: DashboardProps) {
           .select("id", { count: "exact", head: true })
           .eq("user_id", session.user.id)
           .neq("status", "read"),
+
+        supabase
+          .from("email_queue")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", session.user.id)
+          .in("status", ["pending", "processing"]),
       ]);
 
     if (!clientsRes.error) {
@@ -291,6 +315,10 @@ export default function Dashboard({ session }: DashboardProps) {
 
     if (!inboxRes.error) {
       setUnreadEmails(inboxRes.count || 0);
+    }
+
+    if (!queueRes.error) {
+      setQueuePendingCount(queueRes.count || 0);
     }
 
     setLoadingStats(false);
@@ -382,7 +410,8 @@ export default function Dashboard({ session }: DashboardProps) {
     todayFollowUps.length +
     unreadEmails +
     birthdaysToday.length +
-    inactiveClients90.length;
+    inactiveClients90.length +
+    queuePendingCount;
 
   const stats = [
     {
@@ -396,6 +425,12 @@ export default function Dashboard({ session }: DashboardProps) {
       value: loadingStats ? "..." : String(unreadEmails),
       sub: "Réponses clients non lues",
       icon: InboxIcon,
+    },
+    {
+      label: "File Sentinel",
+      value: loadingStats ? "..." : String(queuePendingCount),
+      sub: "Emails programmés",
+      icon: Send,
     },
     {
       label: "Actions dues",
@@ -498,7 +533,7 @@ export default function Dashboard({ session }: DashboardProps) {
 
                 <p className="mt-3 text-sm leading-7 text-slate-600">
                   {activeSignals > 0
-                    ? "Des opportunités, réponses ou relations sensibles demandent ton attention."
+                    ? "Des opportunités, réponses ou opérations Sentinel demandent ton attention."
                     : "Aucun signal critique. Profite-en pour enrichir ton portefeuille."}
                 </p>
               </div>
@@ -511,7 +546,7 @@ export default function Dashboard({ session }: DashboardProps) {
             <div className="mt-5 grid grid-cols-2 gap-3">
               <MiniSignal label="Aujourd’hui" value={todayFollowUps.length} />
               <MiniSignal label="Emails" value={unreadEmails} />
-              <MiniSignal label="Anniv." value={birthdaysToday.length} />
+              <MiniSignal label="Queue" value={queuePendingCount} />
               <MiniSignal label="Dormants" value={inactiveClients90.length} />
             </div>
           </div>
@@ -568,7 +603,7 @@ export default function Dashboard({ session }: DashboardProps) {
           </section>
         )}
 
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {stats.map((item) => {
             const Icon = item.icon;
 
@@ -576,8 +611,13 @@ export default function Dashboard({ session }: DashboardProps) {
               <button
                 key={item.label}
                 onClick={() => {
-                  if (item.label === "Transmissions") setActiveView("email_hub");
-                  if (item.label === "Dossiers actifs") setActiveView("clients");
+                  if (
+                    item.label === "Transmissions" ||
+                    item.label === "File Sentinel"
+                  )
+                    setActiveView("email_hub");
+                  if (item.label === "Dossiers actifs")
+                    setActiveView("clients");
                   if (item.label === "Actions dues") setActiveView("clients");
                 }}
                 className="group rounded-[2rem] border border-white/80 bg-white/75 p-5 text-left shadow-xl shadow-violet-100/50 backdrop-blur-2xl transition hover:-translate-y-1"
@@ -606,7 +646,7 @@ export default function Dashboard({ session }: DashboardProps) {
           })}
         </section>
 
-        <section className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <section className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-4">
           <PriorityCard
             title="Signal chaud"
             value={loadingStats ? "..." : String(todayFollowUps.length)}
@@ -621,6 +661,14 @@ export default function Dashboard({ session }: DashboardProps) {
             subtitle="Réponses client à ouvrir"
             tone="amber"
             emoji="📩"
+          />
+
+          <PriorityCard
+            title="File Sentinel"
+            value={loadingStats ? "..." : String(queuePendingCount)}
+            subtitle="Emails en attente"
+            tone="violet"
+            emoji="📡"
           />
 
           <PriorityCard
@@ -810,14 +858,15 @@ export default function Dashboard({ session }: DashboardProps) {
 }
 
 function EmailHub({ session }: { session: Session }) {
-  const [tab, setTab] = useState<"inbox" | "campaigns" | "welcome" | "logs">(
-    "inbox"
-  );
+  const [tab, setTab] = useState<
+    "inbox" | "campaigns" | "welcome" | "queue" | "logs"
+  >("inbox");
 
   const tabs = [
     { key: "inbox", label: "Boîte de réception", icon: InboxIcon },
     { key: "campaigns", label: "Opérations", icon: Megaphone },
     { key: "welcome", label: "Séquence d’accueil", icon: Mail },
+    { key: "queue", label: "File Sentinel", icon: Send },
     { key: "logs", label: "Historique", icon: Clock3 },
   ] as const;
 
@@ -827,7 +876,7 @@ function EmailHub({ session }: { session: Session }) {
         icon={<InboxIcon size={14} />}
         badge="Centre des transmissions"
         title="Transmissions, opérations et séquences"
-        description="Toutes tes communications client sont regroupées ici : réponses entrantes, campagnes, welcome et historique."
+        description="Toutes tes communications client sont regroupées ici : réponses entrantes, campagnes, welcome, file Sentinel et historique."
       />
 
       <TabBar tabs={tabs} activeTab={tab} setTab={setTab} />
@@ -835,7 +884,167 @@ function EmailHub({ session }: { session: Session }) {
       {tab === "inbox" && <Inbox session={session} />}
       {tab === "campaigns" && <Campaigns session={session} />}
       {tab === "welcome" && <WelcomeBuilder session={session} />}
+      {tab === "queue" && <EmailQueueSentinel session={session} />}
       {tab === "logs" && <EmailLogs session={session} />}
+    </div>
+  );
+}
+
+function EmailQueueSentinel({ session }: { session: Session }) {
+  const [queue, setQueue] = useState<EmailQueueRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processingNow, setProcessingNow] = useState(false);
+
+  const fetchQueue = async () => {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("email_queue")
+      .select(
+        "id, client_id, recipient_email, subject, status, scheduled_at, sent_at, error_message, created_at"
+      )
+      .eq("user_id", session.user.id)
+      .order("scheduled_at", { ascending: false, nullsFirst: false })
+      .limit(100);
+
+    if (!error) {
+      setQueue((data as EmailQueueRow[]) || []);
+    }
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchQueue();
+  }, [session.user.id]);
+
+  const runProcessorNow = async () => {
+    setProcessingNow(true);
+
+    await supabase.functions.invoke("process-email-queue", {
+      body: { source: "mypx-dashboard-manual" },
+    });
+
+    await fetchQueue();
+    setProcessingNow(false);
+  };
+
+  const counts = {
+    pending: queue.filter((item) => item.status === "pending").length,
+    processing: queue.filter((item) => item.status === "processing").length,
+    sent: queue.filter((item) => item.status === "sent").length,
+    failed: queue.filter((item) => item.status === "failed").length,
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-[2rem] border border-white/80 bg-white/80 p-5 shadow-2xl shadow-violet-100 backdrop-blur-2xl sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-cyan-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-cyan-700">
+              <Send size={14} />
+              File d’attente PX Sentinel
+            </div>
+
+            <h2 className="mt-4 text-2xl font-black text-slate-950">
+              Envois progressifs automatisés
+            </h2>
+
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
+              Les emails préparés par l’import massif sont envoyés par le cron
+              Sentinel selon leur heure de programmation.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={fetchQueue}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:text-slate-950 disabled:opacity-60"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              Actualiser
+            </button>
+
+            <button
+              onClick={runProcessorNow}
+              disabled={processingNow}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-xl shadow-slate-300 transition hover:-translate-y-0.5 disabled:opacity-60"
+            >
+              {processingNow ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Wand2 size={16} />
+              )}
+              Lancer Sentinel maintenant
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <QueueStat label="En attente" value={counts.pending} tone="cyan" />
+        <QueueStat
+          label="En traitement"
+          value={counts.processing}
+          tone="violet"
+        />
+        <QueueStat label="Envoyés" value={counts.sent} tone="emerald" />
+        <QueueStat label="Échoués" value={counts.failed} tone="rose" />
+      </section>
+
+      <div className="rounded-[2rem] border border-white/80 bg-white/80 p-4 shadow-2xl shadow-violet-100 backdrop-blur-2xl">
+        {loading ? (
+          <div className="flex items-center justify-center gap-3 py-12 text-sm font-bold text-slate-500">
+            <Loader2 size={18} className="animate-spin" />
+            PX Sentinel inspecte la file...
+          </div>
+        ) : queue.length === 0 ? (
+          <EmptyState text="Aucun email en file Sentinel pour le moment." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-[900px] w-full text-left text-sm text-slate-600">
+              <thead className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                <tr>
+                  <th className="px-4 py-4">Statut</th>
+                  <th className="px-4 py-4">Destinataire</th>
+                  <th className="px-4 py-4">Objet</th>
+                  <th className="px-4 py-4">Prévu le</th>
+                  <th className="px-4 py-4">Envoyé le</th>
+                  <th className="px-4 py-4">Erreur</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {queue.map((item) => (
+                  <tr key={item.id} className="border-t border-slate-100">
+                    <td className="px-4 py-4">
+                      <QueueBadge status={item.status || "pending"} />
+                    </td>
+                    <td className="px-4 py-4 font-bold text-slate-800">
+                      {item.recipient_email}
+                    </td>
+                    <td className="px-4 py-4">{item.subject || "—"}</td>
+                    <td className="px-4 py-4">
+                      {item.scheduled_at
+                        ? new Date(item.scheduled_at).toLocaleString("fr-FR")
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-4">
+                      {item.sent_at
+                        ? new Date(item.sent_at).toLocaleString("fr-FR")
+                        : "—"}
+                    </td>
+                    <td className="max-w-xs px-4 py-4 text-xs text-rose-600">
+                      {item.error_message || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -962,8 +1171,8 @@ function Sidebar({ activeView, setActiveView, unreadEmails }: SidebarProps) {
           </div>
 
           <p className="text-sm leading-6 text-white/65">
-            Analyse les relations, détecte les signaux et priorise les actions
-            à fort impact.
+            Analyse les relations, détecte les signaux et priorise les actions à
+            fort impact.
           </p>
         </div>
       </div>
@@ -1181,6 +1390,58 @@ function DashboardCard({
   );
 }
 
+function QueueStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "cyan" | "violet" | "emerald" | "rose";
+}) {
+  const classes = {
+    cyan: "bg-cyan-50 text-cyan-800 border-cyan-100",
+    violet: "bg-violet-50 text-violet-800 border-violet-100",
+    emerald: "bg-emerald-50 text-emerald-800 border-emerald-100",
+    rose: "bg-rose-50 text-rose-800 border-rose-100",
+  };
+
+  return (
+    <div className={`rounded-[2rem] border p-5 shadow-xl ${classes[tone]}`}>
+      <p className="text-sm font-black">{label}</p>
+      <p className="mt-3 text-3xl font-black">{value}</p>
+    </div>
+  );
+}
+
+function QueueBadge({ status }: { status: string }) {
+  const classes =
+    status === "sent"
+      ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+      : status === "failed"
+      ? "bg-rose-50 text-rose-700 border-rose-100"
+      : status === "processing"
+      ? "bg-violet-50 text-violet-700 border-violet-100"
+      : "bg-cyan-50 text-cyan-700 border-cyan-100";
+
+  const label =
+    status === "sent"
+      ? "Envoyé"
+      : status === "failed"
+      ? "Échoué"
+      : status === "processing"
+      ? "En traitement"
+      : "En attente";
+
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-xs font-black ${classes}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function PriorityCard({
   title,
   value,
@@ -1191,19 +1452,21 @@ function PriorityCard({
   title: string;
   value: string;
   subtitle: string;
-  tone: "orange" | "amber" | "cyan";
+  tone: "orange" | "amber" | "cyan" | "violet";
   emoji: string;
 }) {
   const classes = {
     orange: "border-orange-100 bg-orange-50 text-orange-900",
     amber: "border-amber-100 bg-amber-50 text-amber-900",
     cyan: "border-cyan-100 bg-cyan-50 text-cyan-900",
+    violet: "border-violet-100 bg-violet-50 text-violet-900",
   };
 
   const subClasses = {
     orange: "text-orange-700",
     amber: "text-amber-700",
     cyan: "text-cyan-700",
+    violet: "text-violet-700",
   };
 
   return (
