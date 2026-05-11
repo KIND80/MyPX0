@@ -936,7 +936,17 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
     setImportFileName(file.name);
     setImportRows([]);
 
-    const extension = file.name.split(".").pop()?.toLowerCase();
+    const fileName = file.name.toLowerCase();
+    const extension = fileName.split(".").pop();
+
+    const isCsv = fileName.endsWith(".csv") || fileName.endsWith(".txt");
+    const isExcel = fileName.endsWith(".xlsx") || fileName.endsWith(".xls");
+
+    if (!isCsv && !isExcel) {
+      alert("Merci d’importer un fichier CSV ou Excel.");
+      e.target.value = "";
+      return;
+    }
 
     try {
       let rows: ImportClientRow[] = [];
@@ -979,10 +989,11 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
           return buildImportRowFromRaw(rawRow, index);
         });
       } else {
-        const text = await file.text();
+        const text = (await file.text()).replace(/^\uFEFF/, "");
 
         const lines = text
-          .split(/\r?\n/)
+          .replace(/\r/g, "\n")
+          .split("\n")
           .map((line) => line.trim())
           .filter(Boolean);
 
@@ -1491,7 +1502,7 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
               </span>
               <input
                 type="file"
-                accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                accept=".csv,.xlsx,.xls,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                 onChange={handleImportFile}
                 className="hidden"
               />
