@@ -149,13 +149,23 @@ const sendEmail = async ({
   to,
   subject,
   html,
+  userId,
+  senderName,
 }: {
   to: string;
   subject: string;
   html: string;
+  userId: string;
+  senderName: string;
 }) => {
   const { data, error } = await supabase.functions.invoke("send-email", {
-    body: { to, subject, html },
+    body: {
+      to,
+      subject,
+      html,
+      user_id: userId,
+      sender_name: senderName,
+    },
   });
 
   if (error) {
@@ -549,11 +559,18 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       ? renderedContent
       : renderedContent.split("\n").join("<br />");
 
-    const result = await sendEmail({
-      to: insertedClient.email,
-      subject: renderedSubject,
-      html: htmlToSend,
-    });
+      const result = await sendEmail({
+        to: insertedClient.email,
+        subject: renderedSubject,
+        html: htmlToSend,
+        userId: session.user.id,
+        senderName:
+          settings?.advisor_name ||
+          settings?.company_name ||
+          session.user.user_metadata?.full_name ||
+          session.user.email?.split("@")[0] ||
+          "MyPX",
+      });
 
     await supabase.from("email_logs").insert({
       user_id: session.user.id,
@@ -635,49 +652,44 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
   };
 
   const isValidEmail = (email: string) =>
-    !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
-  const validateImportRow = (row: ImportClientRow) => {
-    const errors: string[] = [];
-
-    const hasIdentity =
-      row.first_name || row.last_name || row.email || row.phone || row.company;
-
-    if (!hasIdentity) errors.push("Ligne vide");
-    if (row.email && !isValidEmail(row.email)) errors.push("Email invalide");
-
-    const alreadyExists = clients.some(
-      (client) =>
-        client.email &&
-        row.email &&
-        client.email.toLowerCase() === row.email.toLowerCase()
-    );
-
-    if (alreadyExists) errors.push("Email déjà présent");
-
-    return errors;
-  };
-
+    !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  
+  const normalizeText = (value: string) =>
+    String(value || "")
+      .toLowerCase()
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/ß/g, "ss");
+  
+  const normalizeHeader = (value: string) =>
+    normalizeText(value).replace(/[^a-z0-9]/g, "");
+  
   const detectSeparator = (line: string) => {
-    const separators = [";", ",", "\t"];
-
-    return separators.reduce((best, current) => {
-      const currentCount = line.split(current).length;
-      const bestCount = line.split(best).length;
-
-      return currentCount > bestCount ? current : best;
-    }, ";");
+    const separators = [";", ",", "\t", "|"];
+    let best = ";";
+    let bestCount = 0;
+  
+    for (const sep of separators) {
+      const count = parseCsvLine(line, sep).length;
+      if (count > bestCount) {
+        best = sep;
+        bestCount = count;
+      }
+    }
+  
+    return best;
   };
-
+  
   const parseCsvLine = (line: string, separator: string) => {
     const result: string[] = [];
     let current = "";
     let insideQuotes = false;
-
+  
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
       const next = line[i + 1];
-
+  
       if (char === '"' && insideQuotes && next === '"') {
         current += '"';
         i++;
@@ -690,94 +702,184 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
         current += char;
       }
     }
-
+  
     result.push(current.trim());
     return result;
   };
-
-  const normalizeHeader = (value: string) =>
-    String(value || "")
-      .toLowerCase()
-      .trim()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]/g, "");
-
+  
   const FIELD_ALIASES: Record<keyof NewClientForm, string[]> = {
     first_name: [
       "prenom",
       "prénom",
-      "first_name",
       "firstname",
       "first name",
+      "first_name",
       "givenname",
       "given name",
+      "forename",
+      "vorname",
+      "vornamen",
+      "name1",
+      "nombre",
+      "nome",
+      "nome proprio",
+      "prénom client",
     ],
     last_name: [
       "nom",
-      "last_name",
       "lastname",
       "last name",
+      "last_name",
       "surname",
       "familyname",
       "family name",
+      "name",
+      "nachname",
+      "familienname",
+      "cognome",
+      "apellido",
+      "apellidos",
+      "nom client",
     ],
     email: [
       "email",
-      "mail",
       "e-mail",
-      "adresse email",
+      "mail",
       "courriel",
+      "adresse email",
       "email address",
+      "emailaddress",
+      "email privat",
+      "email private",
+      "email privé",
+      "email prive",
+      "email geschäft",
+      "email geschaft",
+      "email business",
+      "email professionnel",
       "mail pro",
       "email pro",
+      "correo",
+      "correo electronico",
+      "indirizzo email",
     ],
     phone: [
       "telephone",
       "téléphone",
       "tel",
       "phone",
+      "phone number",
       "mobile",
       "portable",
+      "gsm",
+      "cell",
+      "cellphone",
+      "handy",
+      "mobiltelefon",
+      "telefon",
+      "telefon privat",
+      "telefon geschäft",
+      "telefon geschaft",
+      "telephone portable",
       "numero",
       "numéro",
-      "phone number",
-      "tel portable",
+      "numero telephone",
+      "telefono",
+      "teléfono",
     ],
     company: [
       "societe",
       "société",
-      "company",
       "entreprise",
+      "company",
       "business",
       "organisation",
       "organization",
       "structure",
+      "firmenname",
+      "firma",
+      "unternehmen",
+      "betrieb",
+      "company name",
+      "raison sociale",
+      "organizacion",
+      "organización",
+      "azienda",
+      "societa",
     ],
-    city: ["ville", "city", "localite", "localité", "commune", "lieu"],
+    city: [
+      "ville",
+      "city",
+      "localite",
+      "localité",
+      "commune",
+      "lieu",
+      "ort",
+      "stadt",
+      "wohnort",
+      "localidad",
+      "ciudad",
+      "citta",
+      "localita",
+    ],
     birthday: [
       "anniversaire",
       "birthday",
-      "date naissance",
-      "date de naissance",
       "birthdate",
       "birth date",
+      "date naissance",
+      "date de naissance",
+      "geburtsdatum",
+      "geburtstag",
+      "date of birth",
+      "dob",
+      "fecha nacimiento",
+      "fecha de nacimiento",
+      "data nascita",
+      "data di nascita",
     ],
     group_name: [
       "groupe",
+      "group",
+      "group_name",
       "reseau",
       "réseau",
       "segment",
       "categorie",
       "catégorie",
-      "group",
-      "group_name",
+      "category",
       "source",
       "origine",
+      "tag",
+      "tags",
+      "gruppe",
+      "kategorie",
+      "netzwerk",
+      "kundentyp",
+      "kunden typ",
+      "clienttype",
+      "client type",
+      "typeclient",
+      "type client",
+      "type de client",
+      "segmento",
+      "categoria",
     ],
-    status: ["statut", "status", "etat", "état", "stage", "pipeline"],
+    status: [
+      "statut",
+      "status",
+      "etat",
+      "état",
+      "stage",
+      "pipeline",
+      "statut client",
+      "kundenstatus",
+      "estado",
+      "stato",
+    ],
     potential_amount: [
       "potentiel",
+      "potential",
       "potential_amount",
       "montant",
       "valeur",
@@ -785,9 +887,14 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       "budget potentiel",
       "ca",
       "chiffre affaire",
-      "chiffre d affaire",
       "amount",
       "value",
+      "wert",
+      "betrag",
+      "umsatz",
+      "potenziale",
+      "valor",
+      "importo",
     ],
     notes: [
       "notes",
@@ -802,218 +909,437 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
       "détails",
       "infos diverses",
       "commentaire perso",
+      "bemerkung",
+      "bemerkungen",
+      "notiz",
+      "kommentar",
+      "observaciones",
+      "comentario",
+      "nota",
+      "note interne",
     ],
   };
-
-  const getFieldValue = (
-    row: Record<string, string>,
-    field: keyof NewClientForm
-  ) => {
-    const aliases = FIELD_ALIASES[field] || [];
-
-    for (const alias of aliases) {
-      const normalizedAlias = normalizeHeader(alias);
-      const found = row[normalizedAlias];
-
-      if (found && String(found).trim()) {
-        return String(found).trim();
-      }
-    }
-
-    return "";
+  
+  const CONTENT_FIELD_ALIASES = {
+    full_name: [
+      "nomcomplet",
+      "fullname",
+      "full name",
+      "contact",
+      "contactname",
+      "client",
+      "customer",
+      "customername",
+      "kunde",
+      "kundenname",
+      "namevorname",
+      "nomprenom",
+      "prenomnom",
+      "displayname",
+    ],
   };
-
+  
+  const looksLikeEmail = (value: string) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+  
+  const looksLikePhone = (value: string) => {
+    const raw = String(value || "").trim();
+    const digits = raw.replace(/[^\d]/g, "");
+  
+    if (looksLikeEmail(raw)) return false;
+    if (digits.length < 6 || digits.length > 16) return false;
+  
+    return /^[+\d\s()./-]+$/.test(raw);
+  };
+  
+  const looksLikeDate = (value: string) => {
+    const raw = String(value || "").trim();
+    return (
+      /^\d{4}-\d{1,2}-\d{1,2}$/.test(raw) ||
+      /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(raw)
+    );
+  };
+  
+  const looksLikeAmount = (value: string) => {
+    const raw = String(value || "").trim();
+    if (!raw) return false;
+    if (looksLikePhone(raw)) return false;
+  
+    const cleaned = raw.replace(/[€$CHFchf\s']/g, "").replace(",", ".");
+    return /^\d+(\.\d{1,2})?$/.test(cleaned) && Number(cleaned) > 0;
+  };
+  
+  const cleanPhone = (value: string) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+  
+    const cleaned = raw
+      .replace(/[^\d+]/g, "")
+      .replace(/^00/, "+");
+  
+    return cleaned || raw;
+  };
+  
   const cleanPotentialAmount = (value: string) => {
     if (!value) return "";
-
+  
     const cleaned = String(value)
+      .replace(/[€$CHFchf\s']/g, "")
       .replace(/[^\d,.-]/g, "")
       .replace(",", ".");
-
+  
     const number = Number(cleaned);
-
     return Number.isFinite(number) ? String(number) : "";
   };
-
+  
+  const normalizeDate = (value: string) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+  
+    if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(raw)) {
+      const [y, m, d] = raw.split("-");
+      return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    }
+  
+    const match = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    if (!match) return raw;
+  
+    const day = match[1].padStart(2, "0");
+    const month = match[2].padStart(2, "0");
+    let year = match[3];
+  
+    if (year.length === 2) {
+      year = Number(year) > 30 ? `19${year}` : `20${year}`;
+    }
+  
+    return `${year}-${month}-${day}`;
+  };
+  
   const cleanStatus = (value: string) => {
     const normalized = normalizeHeader(value);
-
-    if (["client", "relationactive", "actif"].includes(normalized)) {
+  
+    if (["client", "customer", "kunde", "active", "actif", "relationactive"].includes(normalized)) {
       return "client";
     }
-
-    if (["chaud", "hot", "urgent", "hotlead"].includes(normalized)) {
+  
+    if (["chaud", "hot", "urgent", "hotlead", "warm", "interesse", "interessiert"].includes(normalized)) {
       return "chaud";
     }
-
-    if (["arelancer", "relance", "relancer", "suivi"].includes(normalized)) {
+  
+    if (["arelancer", "relance", "relancer", "suivi", "followup", "todo", "rappel"].includes(normalized)) {
       return "a_relancer";
     }
-
+  
     return "prospect";
   };
-
+  
   const splitFullName = (fullName: string) => {
-    const parts = fullName.trim().split(/\s+/).filter(Boolean);
-
+    const clean = String(fullName || "").trim().replace(/\s+/g, " ");
+    const parts = clean.split(" ").filter(Boolean);
+  
     if (parts.length === 0) return { firstName: "", lastName: "" };
     if (parts.length === 1) return { firstName: parts[0], lastName: "" };
-
+  
     return {
       firstName: parts[0],
       lastName: parts.slice(1).join(" "),
     };
   };
-
-  const getFullNameValue = (row: Record<string, string>) => {
-    const aliases = [
-      "nom complet",
-      "fullname",
-      "full name",
-      "contact",
-      "contact name",
-      "client",
-      "customer name",
-      "name",
-      "nom prenom",
-      "nom prénom",
-    ];
-
+  
+  const findValueByAliases = (
+    row: Record<string, string>,
+    aliases: string[]
+  ) => {
     for (const alias of aliases) {
-      const found = row[normalizeHeader(alias)];
-      if (found && String(found).trim()) return String(found).trim();
+      const normalizedAlias = normalizeHeader(alias);
+  
+      if (row[normalizedAlias] && String(row[normalizedAlias]).trim()) {
+        return String(row[normalizedAlias]).trim();
+      }
     }
-
+  
     return "";
   };
-
+  
+  const getFieldValue = (
+    row: Record<string, string>,
+    field: keyof NewClientForm
+  ) => findValueByAliases(row, FIELD_ALIASES[field] || []);
+  
+  const getFullNameValue = (row: Record<string, string>) =>
+    findValueByAliases(row, CONTENT_FIELD_ALIASES.full_name);
+  
+  const inferMissingFieldsByContent = (row: ImportClientRow, rawValues: string[]) => {
+    const usedValues = new Set(
+      [
+        row.first_name,
+        row.last_name,
+        row.email,
+        row.phone,
+        row.company,
+        row.city,
+        row.birthday,
+        row.group_name,
+        row.status,
+        row.potential_amount,
+        row.notes,
+      ]
+        .filter(Boolean)
+        .map((v) => String(v).trim())
+    );
+  
+    const candidates = rawValues
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+  
+    for (const value of candidates) {
+      if (!row.email && looksLikeEmail(value)) {
+        row.email = value.toLowerCase();
+        usedValues.add(value);
+        continue;
+      }
+  
+      if (!row.phone && looksLikePhone(value)) {
+        row.phone = cleanPhone(value);
+        usedValues.add(value);
+        continue;
+      }
+  
+      if (!row.birthday && looksLikeDate(value)) {
+        row.birthday = normalizeDate(value);
+        usedValues.add(value);
+        continue;
+      }
+  
+      if (!row.potential_amount && looksLikeAmount(value)) {
+        row.potential_amount = cleanPotentialAmount(value);
+        usedValues.add(value);
+        continue;
+      }
+    }
+  
+    const remainingText = candidates.filter((value) => {
+      if (usedValues.has(value)) return false;
+      if (looksLikeEmail(value)) return false;
+      if (looksLikePhone(value)) return false;
+      if (looksLikeDate(value)) return false;
+      if (looksLikeAmount(value)) return false;
+      return value.length >= 2;
+    });
+  
+    if (!row.first_name && !row.last_name && remainingText.length > 0) {
+      const maybeName = remainingText[0];
+      const split = splitFullName(maybeName);
+  
+      row.first_name = split.firstName;
+      row.last_name = split.lastName;
+    }
+  
+    if (!row.company && remainingText.length > 1) {
+      row.company = remainingText[1];
+    }
+  
+    return row;
+  };
+  
   const normalizeRawRow = (headers: string[], values: string[]) => {
     const rawRow: Record<string, string> = {};
-
+  
     headers.forEach((header, index) => {
-      rawRow[normalizeHeader(header)] = values[index] || "";
+      const baseKey = normalizeHeader(header || `colonne_${index}`);
+      const value = String(values[index] || "").trim();
+  
+      if (!baseKey) return;
+  
+      // Garde la première colonne non vide si le CSV contient plusieurs fois le même titre.
+      // Exemple : Vorname / Name / Anrede répétés plusieurs fois.
+      if (!rawRow[baseKey] || !String(rawRow[baseKey]).trim()) {
+        rawRow[baseKey] = value;
+      }
+  
+      // Clé unique pour éviter les écrasements et garder toutes les infos disponibles.
+      rawRow[`${baseKey}_${index}`] = value;
     });
-
+  
     return rawRow;
   };
-
+  
+  const validateImportRow = (row: ImportClientRow) => {
+    const errors: string[] = [];
+  
+    const hasIdentity =
+      row.first_name || row.last_name || row.email || row.phone || row.company;
+  
+    if (!hasIdentity) errors.push("Ligne vide");
+    if (row.email && !isValidEmail(row.email)) errors.push("Email invalide");
+  
+    const normalizedPhone = cleanPhone(row.phone);
+  
+    const alreadyExists = clients.some((client) => {
+      const sameEmail =
+        client.email &&
+        row.email &&
+        client.email.toLowerCase() === row.email.toLowerCase();
+  
+      const samePhone =
+        client.phone &&
+        normalizedPhone &&
+        cleanPhone(client.phone) === normalizedPhone;
+  
+      return sameEmail || samePhone;
+    });
+  
+    if (alreadyExists) errors.push("Déjà présent");
+  
+    return errors;
+  };
+  
   const buildImportRowFromRaw = (
     rawRow: Record<string, string>,
-    index: number
+    index: number,
+    rawValues: string[] = []
   ): ImportClientRow => {
     const fullName = getFullNameValue(rawRow);
     const splitted = splitFullName(fullName);
-
-    const row: ImportClientRow = {
+  
+    let row: ImportClientRow = {
       id: `${Date.now()}-${index}`,
       selected: true,
       first_name: getFieldValue(rawRow, "first_name") || splitted.firstName,
       last_name: getFieldValue(rawRow, "last_name") || splitted.lastName,
       email: getFieldValue(rawRow, "email").toLowerCase(),
-      phone: getFieldValue(rawRow, "phone"),
+      phone: cleanPhone(getFieldValue(rawRow, "phone")),
       company: getFieldValue(rawRow, "company"),
       city: getFieldValue(rawRow, "city"),
-      birthday: getFieldValue(rawRow, "birthday"),
+      birthday: normalizeDate(getFieldValue(rawRow, "birthday")),
       group_name: getFieldValue(rawRow, "group_name"),
       status: cleanStatus(getFieldValue(rawRow, "status")),
-      potential_amount: cleanPotentialAmount(
-        getFieldValue(rawRow, "potential_amount")
-      ),
+      potential_amount: cleanPotentialAmount(getFieldValue(rawRow, "potential_amount")),
       notes: getFieldValue(rawRow, "notes"),
       errors: [],
     };
-
+  
+    row = inferMissingFieldsByContent(row, rawValues);
+  
     row.errors = validateImportRow(row);
     row.selected = row.errors.length === 0;
-
+  
     return row;
   };
-
+  
+  const readFileAsTextSmart = async (file: File) => {
+    const buffer = await file.arrayBuffer();
+  
+    const utf8 = new TextDecoder("utf-8").decode(buffer);
+    const badChars = (utf8.match(/�/g) || []).length;
+  
+    if (badChars > 0) {
+      try {
+        return new TextDecoder("windows-1252").decode(buffer);
+      } catch {
+        return utf8;
+      }
+    }
+  
+    return utf8;
+  };
+  
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+  
     setImportFileName(file.name);
     setImportRows([]);
-
+  
     const fileName = file.name.toLowerCase();
-    const extension = fileName.split(".").pop();
-
     const isCsv = fileName.endsWith(".csv") || fileName.endsWith(".txt");
     const isExcel = fileName.endsWith(".xlsx") || fileName.endsWith(".xls");
-
+  
     if (!isCsv && !isExcel) {
       alert("Merci d’importer un fichier CSV ou Excel.");
       e.target.value = "";
       return;
     }
-
+  
     try {
       let rows: ImportClientRow[] = [];
-
-      if (extension === "xlsx" || extension === "xls") {
+  
+      if (isExcel) {
         const buffer = await file.arrayBuffer();
-
+  
         const workbook = XLSX.read(buffer, {
           type: "array",
+          cellDates: true,
+          raw: false,
         });
-
+  
         const firstSheetName = workbook.SheetNames[0];
-
+  
         if (!firstSheetName) {
           alert("Aucune feuille Excel détectée.");
           return;
         }
-
+  
         const worksheet = workbook.Sheets[firstSheetName];
-
-        const jsonRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-          worksheet,
-          {
-            defval: "",
-          }
-        );
-
-        if (jsonRows.length === 0) {
+  
+        const tableRows = XLSX.utils.sheet_to_json<string[]>(worksheet, {
+          header: 1,
+          defval: "",
+          raw: false,
+        });
+  
+        const cleanRows = tableRows
+          .map((line) => line.map((cell) => String(cell || "").trim()))
+          .filter((line) => line.some(Boolean));
+  
+        if (cleanRows.length < 1) {
           alert("Le fichier Excel semble vide.");
           return;
         }
-
-        rows = jsonRows.map((item, index) => {
-          const rawRow: Record<string, string> = {};
-
-          Object.entries(item).forEach(([key, value]) => {
-            rawRow[normalizeHeader(key)] = String(value || "").trim();
-          });
-
-          return buildImportRowFromRaw(rawRow, index);
+  
+        const headers = cleanRows[0];
+  
+        rows = cleanRows.slice(1).map((values, index) => {
+          const rawRow = normalizeRawRow(headers, values);
+          return buildImportRowFromRaw(rawRow, index, values);
         });
       } else {
-        const text = (await file.text()).replace(/^\uFEFF/, "");
-
+        const text = (await readFileAsTextSmart(file)).replace(/^\uFEFF/, "");
+  
         const lines = text
+          .replace(/\r\n/g, "\n")
           .replace(/\r/g, "\n")
           .split("\n")
           .map((line) => line.trim())
           .filter(Boolean);
-
+  
         if (lines.length < 2) {
           alert("Le fichier CSV semble vide ou incomplet.");
           return;
         }
-
+  
         const separator = detectSeparator(lines[0]);
         const headers = parseCsvLine(lines[0], separator);
-
+  
         rows = lines.slice(1).map((line, index) => {
           const values = parseCsvLine(line, separator);
           const rawRow = normalizeRawRow(headers, values);
-
-          return buildImportRowFromRaw(rawRow, index);
+          return buildImportRowFromRaw(rawRow, index, values);
         });
       }
-
-      setImportRows(rows);
+  
+      const filteredRows = rows.filter(
+        (row) =>
+          row.first_name ||
+          row.last_name ||
+          row.email ||
+          row.phone ||
+          row.company ||
+          row.city ||
+          row.notes
+      );
+  
+      setImportRows(filteredRows);
     } catch (error) {
       console.error("Erreur import Sentinel:", error);
       alert("Impossible de lire ce fichier. Vérifie le format CSV ou Excel.");
@@ -1572,30 +1898,68 @@ ${settings?.advisor_name || settings?.company_name || "MyPX"}
                           </td>
 
                           {[
-                            "first_name",
-                            "last_name",
-                            "email",
-                            "phone",
-                            "company",
-                            "city",
-                            "group_name",
-                            "status",
-                            "potential_amount",
-                          ].map((field) => (
-                            <td key={field} className="px-3 py-3">
-                              <input
-                                value={row[field as keyof NewClientForm]}
-                                onChange={(e) =>
-                                  updateImportRow(
-                                    row.id,
-                                    field as keyof NewClientForm,
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full min-w-[120px] rounded-xl border border-slate-200 px-3 py-2 font-semibold outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
-                              />
-                            </td>
-                          ))}
+  "first_name",
+  "last_name",
+  "email",
+  "phone",
+  "company",
+  "city",
+  "group_name",
+  "status",
+  "potential_amount",
+].map((field) => (
+  <td key={field} className="px-3 py-3">
+    {field === "group_name" ? (
+      <>
+        <input
+          list={`groups-${row.id}`}
+          value={row.group_name}
+          onChange={(e) =>
+            updateImportRow(row.id, "group_name", e.target.value)
+          }
+          placeholder="Choisir ou écrire"
+          className="w-full min-w-[150px] rounded-xl border border-slate-200 px-3 py-2 font-semibold outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+        />
+
+        <datalist id={`groups-${row.id}`}>
+          {groups.map((group) => (
+            <option key={group} value={group} />
+          ))}
+          <option value="Privatperson" />
+          <option value="Organisation" />
+          <option value="Prospect" />
+          <option value="Client" />
+          <option value="Assurance" />
+          <option value="Invest" />
+          <option value="Premium" />
+        </datalist>
+      </>
+    ) : field === "status" ? (
+      <select
+        value={row.status}
+        onChange={(e) => updateImportRow(row.id, "status", e.target.value)}
+        className="w-full min-w-[140px] rounded-xl border border-slate-200 px-3 py-2 font-semibold outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+      >
+        <option value="prospect">prospect</option>
+        <option value="client">client</option>
+        <option value="chaud">chaud</option>
+        <option value="a_relancer">a_relancer</option>
+      </select>
+    ) : (
+      <input
+        value={row[field as keyof NewClientForm]}
+        onChange={(e) =>
+          updateImportRow(
+            row.id,
+            field as keyof NewClientForm,
+            e.target.value
+          )
+        }
+        className="w-full min-w-[120px] rounded-xl border border-slate-200 px-3 py-2 font-semibold outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-100"
+      />
+    )}
+  </td>
+))}
 
                           <td className="px-3 py-3">
                             {row.errors.length === 0 ? (

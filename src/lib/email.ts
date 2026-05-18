@@ -4,15 +4,25 @@ type SendEmailPayload = {
   to: string;
   subject: string;
   html: string;
+  user_id?: string;
+  sender_name?: string;
 };
 
-export const sendEmail = async ({ to, subject, html }: SendEmailPayload) => {
+export const sendEmail = async ({
+  to,
+  subject,
+  html,
+  user_id,
+  sender_name,
+}: SendEmailPayload) => {
   try {
     const { data, error } = await supabase.functions.invoke("send-email", {
       body: {
         to,
         subject,
         html,
+        user_id,
+        sender_name,
       },
     });
 

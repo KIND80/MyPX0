@@ -9,6 +9,7 @@ import Clients from "./Clients";
 import RadarAI from "./RadarAI";
 import Settings from "./Settings";
 import Inbox from "./Inbox";
+import Missions from "./Missions";
 import {
   Bell,
   Bot,
@@ -41,7 +42,13 @@ type DashboardProps = {
   session: Session;
 };
 
-type ActiveView = "home" | "clients" | "email_hub" | "radar_ai" | "settings";
+type ActiveView =
+  | "home"
+  | "clients"
+  | "email_hub"
+  | "radar_ai"
+  | "missions"
+  | "settings";
 
 type ClientRow = {
   id: string;
@@ -118,6 +125,7 @@ const navItems: {
   { view: "home", label: "Commandement", icon: LayoutDashboard },
   { view: "email_hub", label: "Transmissions", icon: InboxIcon },
   { view: "radar_ai", label: "PX Sentinel", icon: Radar },
+  { view: "missions", label: "Missions", icon: CheckCircle2 },
   { view: "clients", label: "Dossiers", icon: Users },
   { view: "settings", label: "Réglages", icon: SettingsIcon },
 ];
@@ -145,6 +153,7 @@ function getInitialView(): ActiveView {
     "clients",
     "email_hub",
     "radar_ai",
+    "missions",
     "settings",
   ];
 
@@ -451,6 +460,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const viewComponents: Record<Exclude<ActiveView, "home">, React.ReactNode> = {
     radar_ai: <RadarAI session={session} />,
     email_hub: <EmailHub session={session} />,
+    missions: <Missions session={session} />,
     clients: <ClientsHub session={session} />,
     settings: <Settings session={session} />,
   };

@@ -135,7 +135,14 @@ const sendEmail = async ({
   user_email: string;
 }) => {
   const { data, error } = await supabase.functions.invoke("send-email", {
-    body: { to, subject, html, user_id, user_name, user_email },
+    body: {
+      to,
+      subject,
+      html,
+      user_id,
+      sender_name: user_name,
+      user_email,
+    },
   });
 
   if (error) {
@@ -876,14 +883,56 @@ export default function ClientDetail({
         />
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <FieldInput icon={<User size={14} />} value={client.first_name || ""} onChange={(v) => updateClientField("first_name", v)} placeholder="Prénom" />
-          <FieldInput icon={<User size={14} />} value={client.last_name || ""} onChange={(v) => updateClientField("last_name", v)} placeholder="Nom" />
-          <FieldInput icon={<Mail size={14} />} value={client.email || ""} onChange={(v) => updateClientField("email", v)} placeholder="Email" />
-          <FieldInput icon={<Phone size={14} />} value={client.phone || ""} onChange={(v) => updateClientField("phone", v)} placeholder="Téléphone" />
-          <FieldInput icon={<Building2 size={14} />} value={client.company || ""} onChange={(v) => updateClientField("company", v)} placeholder="Entreprise" />
-          <FieldInput icon={<MapPin size={14} />} value={client.city || ""} onChange={(v) => updateClientField("city", v)} placeholder="Ville" />
-          <FieldInput icon={<CalendarDays size={14} />} value={client.birthday || ""} onChange={(v) => updateClientField("birthday", v)} placeholder="Moment relationnel" type="date" />
-          <FieldInput icon={<Euro size={14} />} value={client.potential_amount?.toString() || ""} onChange={(v) => updateClientField("potential_amount", v)} placeholder="Potentiel commercial" type="number" />
+          <FieldInput
+            icon={<User size={14} />}
+            value={client.first_name || ""}
+            onChange={(v) => updateClientField("first_name", v)}
+            placeholder="Prénom"
+          />
+          <FieldInput
+            icon={<User size={14} />}
+            value={client.last_name || ""}
+            onChange={(v) => updateClientField("last_name", v)}
+            placeholder="Nom"
+          />
+          <FieldInput
+            icon={<Mail size={14} />}
+            value={client.email || ""}
+            onChange={(v) => updateClientField("email", v)}
+            placeholder="Email"
+          />
+          <FieldInput
+            icon={<Phone size={14} />}
+            value={client.phone || ""}
+            onChange={(v) => updateClientField("phone", v)}
+            placeholder="Téléphone"
+          />
+          <FieldInput
+            icon={<Building2 size={14} />}
+            value={client.company || ""}
+            onChange={(v) => updateClientField("company", v)}
+            placeholder="Entreprise"
+          />
+          <FieldInput
+            icon={<MapPin size={14} />}
+            value={client.city || ""}
+            onChange={(v) => updateClientField("city", v)}
+            placeholder="Ville"
+          />
+          <FieldInput
+            icon={<CalendarDays size={14} />}
+            value={client.birthday || ""}
+            onChange={(v) => updateClientField("birthday", v)}
+            placeholder="Moment relationnel"
+            type="date"
+          />
+          <FieldInput
+            icon={<Euro size={14} />}
+            value={client.potential_amount?.toString() || ""}
+            onChange={(v) => updateClientField("potential_amount", v)}
+            placeholder="Potentiel commercial"
+            type="number"
+          />
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -962,8 +1011,19 @@ export default function ClientDetail({
               Action demain
             </button>
 
-            <FieldInput icon={<CalendarDays size={14} />} value={followUpDate} onChange={setFollowUpDate} placeholder="Date d’action" type="datetime-local" />
-            <FieldInput icon={<Bell size={14} />} value={followUpTitle} onChange={setFollowUpTitle} placeholder="Titre de l’action" />
+            <FieldInput
+              icon={<CalendarDays size={14} />}
+              value={followUpDate}
+              onChange={setFollowUpDate}
+              placeholder="Date d’action"
+              type="datetime-local"
+            />
+            <FieldInput
+              icon={<Bell size={14} />}
+              value={followUpTitle}
+              onChange={setFollowUpTitle}
+              placeholder="Titre de l’action"
+            />
 
             <textarea
               value={followUpNote}
@@ -978,7 +1038,11 @@ export default function ClientDetail({
               disabled={savingFollowUp}
               className="inline-flex items-center gap-2 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 disabled:opacity-60"
             >
-              {savingFollowUp ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+              {savingFollowUp ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Plus size={16} />
+              )}
               Créer l’action
             </button>
           </div>
@@ -997,7 +1061,11 @@ export default function ClientDetail({
             disabled={enrichingAI}
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-cyan-950/30 transition hover:-translate-y-0.5 disabled:opacity-60"
           >
-            {enrichingAI ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            {enrichingAI ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Sparkles size={16} />
+            )}
             Lancer l’analyse Sentinel
           </button>
 
@@ -1006,24 +1074,34 @@ export default function ClientDetail({
             disabled={findingOpportunity}
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 disabled:opacity-60"
           >
-            {findingOpportunity ? <Loader2 size={16} className="animate-spin" /> : <Lightbulb size={16} />}
+            {findingOpportunity ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Lightbulb size={16} />
+            )}
             Détecter une approche
           </button>
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <InfoCard title="Analyse Sentinel">
-            {client.ai_summary || "Aucune analyse Sentinel disponible pour ce dossier."}
+            {client.ai_summary ||
+              "Aucune analyse Sentinel disponible pour ce dossier."}
           </InfoCard>
           <InfoCard title="Action recommandée">
-            {client.next_best_action || "Aucune action prioritaire détectée pour le moment."}
+            {client.next_best_action ||
+              "Aucune action prioritaire détectée pour le moment."}
           </InfoCard>
         </div>
 
         {conversationOpportunity && (
           <div className="mt-4 rounded-3xl border border-cyan-300/30 bg-cyan-400/10 p-4">
-            <p className="text-sm font-black text-white">{conversationOpportunity.angle}</p>
-            <p className="mt-2 text-sm text-slate-300">{conversationOpportunity.reason}</p>
+            <p className="text-sm font-black text-white">
+              {conversationOpportunity.angle}
+            </p>
+            <p className="mt-2 text-sm text-slate-300">
+              {conversationOpportunity.reason}
+            </p>
             <div className="mt-3 rounded-2xl bg-white p-4 text-sm leading-6 text-slate-700">
               {conversationOpportunity.message}
             </div>
@@ -1044,7 +1122,12 @@ export default function ClientDetail({
         description="Envoie une transmission personnalisée avec ta signature automatique MyPX."
       >
         <div className="mt-4 space-y-3">
-          <FieldInput icon={<Mail size={14} />} value={emailSubject} onChange={setEmailSubject} placeholder="Sujet de la transmission" />
+          <FieldInput
+            icon={<Mail size={14} />}
+            value={emailSubject}
+            onChange={setEmailSubject}
+            placeholder="Sujet de la transmission"
+          />
 
           <textarea
             value={emailContent}
@@ -1059,7 +1142,11 @@ export default function ClientDetail({
             disabled={sendingEmail}
             className="inline-flex items-center gap-2 rounded-2xl bg-violet-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:-translate-y-0.5 disabled:opacity-60"
           >
-            {sendingEmail ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            {sendingEmail ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Send size={16} />
+            )}
             Envoyer la transmission
           </button>
         </div>
@@ -1068,7 +1155,9 @@ export default function ClientDetail({
       <section className="rounded-[2rem] border border-white/75 bg-white/80 p-5 shadow-2xl shadow-violet-100/60 backdrop-blur-2xl sm:p-6">
         <div className="flex items-center gap-2">
           <Mail size={18} className="text-violet-700" />
-          <h3 className="text-lg font-black text-slate-950">Chronologie relationnelle</h3>
+          <h3 className="text-lg font-black text-slate-950">
+            Chronologie relationnelle
+          </h3>
         </div>
 
         <div className="mt-5 max-h-[520px] space-y-3 overflow-y-auto pr-1">
@@ -1110,7 +1199,8 @@ export default function ClientDetail({
                           {item.type === "follow_up" && <Bell size={12} />}
 
                           {item.type === "email" && "Transmission envoyée"}
-                          {item.type === "email_received" && "Transmission reçue"}
+                          {item.type === "email_received" &&
+                            "Transmission reçue"}
                           {item.type === "note" && "Renseignement"}
                           {item.type === "follow_up" && "Action"}
                         </span>
@@ -1122,11 +1212,14 @@ export default function ClientDetail({
                         )}
                       </div>
 
-                      <p className="mt-3 text-sm font-black text-slate-950">{item.title}</p>
+                      <p className="mt-3 text-sm font-black text-slate-950">
+                        {item.title}
+                      </p>
 
                       {isReceived && (
                         <p className="mt-1 text-xs font-bold text-emerald-700">
-                          Source : {item.from_name || item.from_email || "Client"}
+                          Source :{" "}
+                          {item.from_name || item.from_email || "Client"}
                         </p>
                       )}
 
@@ -1246,10 +1339,18 @@ function SectionHeader({
           {icon}
           {eyebrow}
         </p>
-        <h3 className={`mt-2 text-2xl font-black ${dark ? "text-white" : "text-slate-950"}`}>
+        <h3
+          className={`mt-2 text-2xl font-black ${
+            dark ? "text-white" : "text-slate-950"
+          }`}
+        >
           {title}
         </h3>
-        <p className={`mt-2 text-sm leading-6 ${dark ? "text-slate-300" : "text-slate-500"}`}>
+        <p
+          className={`mt-2 text-sm leading-6 ${
+            dark ? "text-slate-300" : "text-slate-500"
+          }`}
+        >
           {description}
         </p>
       </div>
@@ -1300,7 +1401,9 @@ function ActionPanel({
             <span className="text-cyan-300">{icon}</span>
             <h3 className="text-lg font-black text-white">{title}</h3>
           </div>
-          <p className="mt-2 text-sm font-medium text-slate-300">{description}</p>
+          <p className="mt-2 text-sm font-medium text-slate-300">
+            {description}
+          </p>
           {children}
         </div>
       </div>
